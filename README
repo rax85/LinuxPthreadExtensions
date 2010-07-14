@@ -1,1 +1,22 @@
-Coming soon!
+Linux PThread Extensions.
+
+This library provides some functionality that I thought would be a nice
+addition to the stock pthread library. 
+
+This is a list of currently available functionality:
+1. Thread Pools.
+    - Fixed sized thread pools are minimally tested.
+    - Variable sized thread pools are coded up but are not tested.
+
+2. Semaphores.
+    - The blocking semaphore is implemented and minimally tested. This is
+      built entirely using pthread routines and not posix semaphores.
+    - Timed semaphore locks are not yet implemented.
+
+* 'make' builds the library.
+* 'make documentation' builds doxygen documentation. You need doxygen for this
+  target to build.
+* 'make test' builds test.out a binary that runs a few simple tests.
+
+Keep checking back for developments!
+
