@@ -36,5 +36,8 @@ documentation : Doxyfile
 Doxyfile :
 	doxygen -g
 
+test : test.c staticlib
+	gcc -g -o test.out test.c libpthreadext.a -lpthread 
+
 .PHONY clean : 
-	rm -f *.a *.so.* *.o; rm -rf html; rm -rf latex; rm -f Doxyfile
+	rm -f *.a *.so.* *.o *.out; rm -rf html; rm -rf latex; rm -f Doxyfile

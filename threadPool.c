@@ -172,6 +172,12 @@ ThreadFuture *threadPoolExecute(ThreadPool *pool, void *(*callback)(void *), voi
 	return NULL;
     }
 
+    if (0 != sem_down(&future->resultAvailable)) {
+        sem_destroy(&future->resultAvailable);
+        free(future);
+        return NULL;
+    }
+
     /* Create a work item for the pool worker to process. */
     workItem = (WorkItem *)malloc(sizeof(WorkItem));
     if (workItem == NULL) {
@@ -290,7 +296,7 @@ int getFirstAvailableWorker(ThreadPool *pool)
  */
 int signalWorker(Thread *worker)
 {
-    if (0 != pthread_cond_signal(&worker->workAvailable)) {
+    if (0 != sem_up(&worker->workAvailable)) {
         return THREAD_POOL_FAILURE;
     }
 
@@ -315,8 +321,10 @@ int addNewWorker(ThreadPool *pool)
     /* Create and initalize a Thread object. */
     runnable = (Thread *)malloc(sizeof(Thread));
     if (runnable == NULL) { return THREAD_POOL_FAILURE; }
-    if (0 != pthread_mutex_init(&runnable->workMutex, NULL)) { goto destroy_thread3; }
-    if (0 != pthread_cond_init(&runnable->workAvailable, NULL)) { goto destroy_thread2; }
+
+    /* Initialize the semaphore and set it to locked so that the thread can wait */
+    if (0 != sem_init(&runnable->workAvailable, 1)) { goto destroy_thread2; }
+    if (0 != sem_down(&runnable->workAvailable)) { goto destroy_thread1; }
 
     /* Acquire the lock and grow the thread pool. */
     if (0 != pthread_mutex_lock(&pool->avlblMutex)) { goto destroy_thread1; }
@@ -344,10 +352,9 @@ int addNewWorker(ThreadPool *pool)
     pthread_mutex_unlock(&pool->avlblMutex);
     return THREAD_POOL_SUCCESS;
 
-destroy_thread1: pthread_cond_destroy(&runnable->workAvailable);
-destroy_thread2: pthread_mutex_destroy(&runnable->workMutex);
-destroy_thread3: free(runnable);
-   return THREAD_POOL_FAILURE;
+destroy_thread1: sem_destroy(&runnable->workAvailable);
+destroy_thread2: free(runnable);
+    return THREAD_POOL_FAILURE;
 }
 
 /**
@@ -367,18 +374,14 @@ void *worker(void *param)
 
     while (1) {
         // Wait for some work to be available.
-        if (0 != pthread_mutex_lock(&runnable->workMutex)) {
-	    return NULL;
-	}
-
-        if (0 != pthread_cond_wait(&runnable->workAvailable, &runnable->workMutex)) {
+        if (0 != sem_down(&runnable->workAvailable)) {
 	    return NULL;
 	}
 
 	workItem = runnable->workItem;
-	// If the work item is NULL, exit cleanly.
+	
+        // If the work item is NULL, exit cleanly.
 	if (workItem == NULL) {
-	    pthread_mutex_unlock(&runnable->workMutex);
 	    break;
 	}
 
@@ -387,6 +390,7 @@ void *worker(void *param)
 
 	// Done running the user function, lets set up the returns for the caller.
 	future = workItem->future;
+        future->result = retval;
 	sem_up(&future->resultAvailable);
 
 	// Finally, mark this thread as available.
@@ -400,7 +404,12 @@ void *worker(void *param)
 	    // Better die and let things crash out.
 	    return NULL;
 	}
+
+        if (0 != sem_up(&parent->threadCounter)) {
+            return NULL;
+        }
     }
+
     return NULL;
 }
 

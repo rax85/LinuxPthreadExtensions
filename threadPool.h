@@ -80,12 +80,11 @@ struct __ThreadPool;
  * @brief A struct to describe a thread in the pool.
  */
 typedef struct __Thread {
-    pthread_t tid;                  /**< The thread id of the thread. */
-    int index;                      /**< The index of this thread in the pool. */
-    pthread_cond_t workAvailable;   /**< Signals that work is available. */
-    pthread_mutex_t workMutex;      /**< Bogus mutex for the cvar. */
-    WorkItem *workItem;             /**< A work item for the worker to process. */
-    struct __ThreadPool *parent;    /**< The parent thread pool of this worker. */
+    pthread_t tid;                /**< The thread id of the thread. */
+    int index;                    /**< The index of this thread in the pool. */
+    Semaphore workAvailable;      /**< Signals that work is available. */
+    WorkItem *workItem;           /**< A work item for the worker to process. */
+    struct __ThreadPool *parent;  /**< The parent thread pool of this worker. */
 }Thread;
 
 /**
