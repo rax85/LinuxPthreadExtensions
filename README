@@ -6,7 +6,7 @@ addition to the stock pthread library.
 This is a list of currently available functionality:
 1. Thread Pools.
     - Fixed sized thread pools are minimally tested.
-    - Variable sized thread pools are coded up but are not tested.
+    - Variable sized thread pools are minimally tested.
 
 2. Semaphores.
     - The blocking semaphore is implemented and minimally tested. This is

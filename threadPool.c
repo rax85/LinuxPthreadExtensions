@@ -54,22 +54,22 @@ ThreadPool *threadPoolInit(int minThreads, int maxThreads, PoolType type)
     pool->minThreads = minThreads;
     pool->maxThreads = maxThreads;
 
+    if (0 != pthread_mutex_init(&pool->avlblMutex, NULL)) {
+        goto pool_destroy1;
+    }
+
     if (SEMAPHORE_SUCCESS != sem_init(&pool->threadCounter, maxThreads)) {
-        free(pool);
-        return NULL;
+        goto pool_destroy2; 
     }
     
     pool->threads = (Thread **)malloc(sizeof(Thread *) * maxThreads);
     if (pool->threads == NULL) {
-        free(pool);
-	return NULL;
+        goto pool_destroy3;
     }
 
     pool->availability = (char *)malloc(sizeof(char) * maxThreads);
     if (pool->availability == NULL) {
-        free(pool->threads);
-	free(pool);
-	return NULL;
+        goto pool_destroy4;
     }
 
     /* Now create the thread pool. */
@@ -81,11 +81,18 @@ ThreadPool *threadPoolInit(int minThreads, int maxThreads, PoolType type)
     for (i = 0; i < minThreads; i++) {
         if (THREAD_POOL_SUCCESS != addNewWorker(pool)) {
 	    // TODO: Need to do a cleanup here.
-	    return NULL;
+	    goto pool_destroy5;
 	}
     }
 
     return pool;
+
+pool_destroy5: free(pool->availability);
+pool_destroy4: free(pool->threads);
+pool_destroy3: pthread_mutex_destroy(&pool->avlblMutex);
+pool_destroy2: sem_destroy(&pool->threadCounter);
+pool_destroy1: free(pool);
+   return NULL;
 }
 
 /**
@@ -111,7 +118,7 @@ int threadPoolDestroy(ThreadPool *pool)
     }
 
     // Now tell all the threads to die.
-    for (i = 0; i < pool->maxThreads; i++) {
+    for (i = 0; i < pool->numAlive; i++) {
         runnable = pool->threads[i];
 	if (runnable != NULL) {
 	    /* Sending a NULL work item to the worker causes it to exit cleanly. */
