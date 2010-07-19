@@ -81,6 +81,89 @@ int sem_destroy(Semaphore *sem)
  */
 int sem_up(Semaphore *sem)
 {
+    return sem_up_multiple(sem, 1);
+}
+
+
+
+/**
+ * @brief  Decrement the semaphore value. Will block if the decrement
+ *         causes the semaphore to fall below 0.
+ * @param  sem   The semaphore to decrement.
+ * @return 0 on success, -1 on failure.
+ */
+int sem_down(Semaphore *sem)
+{
+    return sem_down_multiple(sem, 1); 
+}
+
+/**
+ * @brief  Add or subtract a value from the semaphore.
+ * @param  sem   The semaphore to operate on.
+ * @param  value The value to add to the semaphore. Negative values can be used
+ *               for sem decrements.
+ * @return 0 on success -1 otherwise.
+ */
+int sem_op(Semaphore *sem, int value)
+{
+    if (value == 0) {
+        return SEMAPHORE_FAILURE;
+    }
+
+    if (value > 0) {
+        return sem_up_multiple(sem, value);
+    } else {
+        return sem_down_multiple(sem, -1 * value);
+    }
+}
+
+/**
+ * @brief  Subtract a value from the semaphore.
+ * @param  sem The semaphore to operate on.
+ * @param  value The value to subtract from the semaphore.
+ * @return 0 on success, -1 on failure.
+ */
+int sem_down_multiple(Semaphore *sem, int value)
+{
+    int retval = 0;
+
+    if (sem == NULL || sem->initialized != SEMAPHORE_INITIALIZED) {
+        return SEMAPHORE_FAILURE;
+    }
+    
+    // Grab the mutex.
+    if (pthread_mutex_lock(&sem->sem_mutex) != 0) {
+        return SEMAPHORE_FAILURE;
+    }
+
+    // Wait for a time when you are legally allowed to decrement the semaphore.
+    while (sem->value < value) {
+        retval = pthread_cond_wait(&sem->sem_cvar, &sem->sem_mutex);
+        
+        if (retval != 0) {
+            return SEMAPHORE_FAILURE;
+        }
+    }
+
+    // Definitely most certainly have the mutex here.
+    sem->value -= value;
+
+    // Unlock the mutex and exit.
+    if (pthread_mutex_unlock(&sem->sem_mutex) != 0) {
+        return SEMAPHORE_FAILURE;
+    }
+    
+    return SEMAPHORE_SUCCESS;
+}
+
+/**
+ * @brief  Add a value to the semaphore.
+ * @param  sem The semaphore to operate on.
+ * @param  value The value to add to the semaphore.
+ * @return 0 on success, -1 on failure.
+ */
+int sem_up_multiple(Semaphore *sem, int value)
+{
     if (sem == NULL || sem->initialized != SEMAPHORE_INITIALIZED) {
         return SEMAPHORE_FAILURE;
     }
@@ -91,7 +174,7 @@ int sem_up(Semaphore *sem)
     }
     
     // Increment the semaphore value.
-    sem->value += 1;
+    sem->value += value;
 
     // Unlock the mutex.
     if (pthread_mutex_unlock(&sem->sem_mutex) != 0) {
@@ -107,57 +190,96 @@ int sem_up(Semaphore *sem)
     return SEMAPHORE_SUCCESS;
 }
 
+/**
+ * @brief  The timed version of sem_op.
+ * @param  sem The semaphore to operate on.
+ * @param  value The value to add.
+ * @param  timeoutMillis Timeout in milliseconds.
+ * @return 0 on success, -1 on failure, -2 on timeout.
+ */
+int sem_timed_op(Semaphore *sem, int value, long timeoutMillis)
+{
+    if (value == 0) {
+        return SEMAPHORE_FAILURE;
+    }
+
+    if (value > 0) {
+        return sem_timed_up(sem, value, timeoutMillis);
+    } else {
+        return sem_timed_down(sem, -1 * value, timeoutMillis);
+    }
+}
 
 /**
- * @brief Decrement the semaphore. Block for as long as the specified timeout.
- * @param sem The semaphore to decrement.
- * @param timeoutMillis Timeout in milliseconds.
- * @return 0 on success, -1 on failure.
+ * @brief  Decrement the semaphore. Block for as long as the specified timeout.
+ * @param  sem The semaphore to decrement.
+ * @param  value The value to decrement from the semaphore.
+ * @param  timeoutMillis Timeout in milliseconds.
+ * @return 0 on success, -1 on failure, -2 on failure.
  */
-int sem_timed_down(Semaphore *sem, long timeoutMillis)
+int sem_timed_down(Semaphore *sem, int value, long timeoutMillis)
 {
+    struct timespec timeout;
+    struct timespec before;
+    struct timespec after;
+    int retval = 0;
+
     if (sem == NULL || sem->initialized != SEMAPHORE_INITIALIZED) {
         return SEMAPHORE_FAILURE;
     }
 
     if (timeoutMillis <= 0) {
         return SEMAPHORE_FAILURE;
+    } else {
+        timeout = timeoutToTimespec(timeoutMillis);
     }
-    
-    assert(0);
-    return SEMAPHORE_SUCCESS;
-}
 
-/**
- * @brief  Decrement the semaphore value. Will block if the decrement
- *         causes the semaphore to fall below 0.
- * @param  sem   The semaphore to decrement.
- * @return 0 on success, -1 on failure.
- */
-int sem_down(Semaphore *sem)
-{
-    int retval = 0;
-
-    if (sem == NULL || sem->initialized != SEMAPHORE_INITIALIZED) {
-        return SEMAPHORE_FAILURE;
+    // Grab the mutex with a maximum of the specified timeout.
+    clock_gettime(CLOCK_REALTIME, &before);
+    if (pthread_mutex_timedlock(&sem->sem_mutex, &timeout) != 0) {
+        if (errno == ETIMEDOUT) {
+            return SEMAPHORE_TIMEOUT;
+        } else {
+            return SEMAPHORE_FAILURE;
+        }
     }
-    
-    // Grab the mutex.
-    if (pthread_mutex_lock(&sem->sem_mutex) != 0) {
-        return SEMAPHORE_FAILURE;
+    clock_gettime(CLOCK_REALTIME, &after);
+
+    // We measured how long that operation took. Now readjust the timeout
+    // such that it holds the remaining time.
+    timeoutMillis -= timespecDiffMillis(after, before);
+    if (timeoutMillis < 0) {
+        return SEMAPHORE_TIMEOUT;
     }
 
     // Wait for a time when you are legally allowed to decrement the semaphore.
-    while (sem->value <= 0) {
-        retval = pthread_cond_wait(&sem->sem_cvar, &sem->sem_mutex);
+    while (sem->value < value) {
+        timeout = timeoutToTimespec(timeoutMillis);
+        clock_gettime(CLOCK_REALTIME, &before);
+        retval = pthread_cond_timedwait(&sem->sem_cvar, &sem->sem_mutex, &timeout);
+        clock_gettime(CLOCK_REALTIME, &after);
+
+        timeoutMillis -= timespecDiffMillis(after, before);
         
+        // Cvar wait timed out or failed.
         if (retval != 0) {
-            return SEMAPHORE_FAILURE;
+            if (errno == ETIMEDOUT) {
+                return SEMAPHORE_TIMEOUT;
+            } else {
+                perror(NULL);
+                return SEMAPHORE_FAILURE;
+            }
+        }
+
+        // Cvar wait succeeded but we dont have any more time left. Too bad.
+        if (timeoutMillis <= 0) {
+            pthread_mutex_unlock(&sem->sem_mutex);
+            return SEMAPHORE_TIMEOUT;
         }
     }
 
     // Definitely most certainly have the mutex here.
-    sem->value -= 1;
+    sem->value -= value;
 
     // Unlock the mutex and exit.
     if (pthread_mutex_unlock(&sem->sem_mutex) != 0) {
@@ -165,6 +287,103 @@ int sem_down(Semaphore *sem)
     }
     
     return SEMAPHORE_SUCCESS;
+}
+
+/**
+ * @brief  Timed version of sem_up_multiple. The timeout is not guaranteed to be 
+ *         exact in any situation. It depends on more factors than can be controlled
+ *         from userspace.
+ * @param  sem The semaphore to operate on.
+ * @param  value The value to add to the semaphore.
+ * @param  timeoutMillis Timeout in milliseconds for the operation.
+ * @return 0 on success, -1 on failure, -2 on failure.
+ */
+int sem_timed_up(Semaphore *sem, int value, long timeoutMillis)
+{
+    struct timespec timeout;
+
+    if (sem == NULL || sem->initialized != SEMAPHORE_INITIALIZED) {
+        return SEMAPHORE_FAILURE;
+    }
+
+    if (timeoutMillis <= 0) {
+        return SEMAPHORE_FAILURE;
+    } else {
+        timeout = timeoutToTimespec(timeoutMillis);
+    }
+
+    // Grab the mutex.
+    if (pthread_mutex_timedlock(&sem->sem_mutex, &timeout) != 0) {
+        if (errno == ETIMEDOUT) {
+            return SEMAPHORE_TIMEOUT;
+        } else {
+            return SEMAPHORE_FAILURE;
+        }
+    }
+    
+    // Increment the semaphore value.
+    sem->value += value;
+
+    // Unlock the mutex.
+    if (pthread_mutex_unlock(&sem->sem_mutex) != 0) {
+        return SEMAPHORE_FAILURE;
+    }
+
+    // Tell someone to wake up.
+    if (pthread_cond_signal(&sem->sem_cvar) != 0) {
+        pthread_mutex_unlock(&sem->sem_mutex);
+        return SEMAPHORE_FAILURE;
+    }
+    
+    return SEMAPHORE_SUCCESS;
+}
+
+/**
+ * @brief  Helper method to convert a timout value in milliseconds to a 
+ *         struct timespec that is in absolute time.
+ * @param  timeoutMillis Time in milliseconds.
+ * @return The same value represented in a struct timespec as absolute time.
+ */
+struct timespec timeoutToTimespec(long timeoutMillis)
+{
+    struct timespec time;
+    long timeoutSec = 0;
+    long timeoutNanos = 0;
+     
+    memset(&time, 0, sizeof(struct timespec));
+    timeoutSec = timeoutMillis / 1000;
+    timeoutMillis -= (timeoutSec * 1000);
+    timeoutNanos = timeoutMillis * 1000 * 1000;
+
+    clock_gettime(CLOCK_REALTIME, &time);
+    time.tv_sec += timeoutSec;
+    time.tv_nsec += timeoutNanos;
+    if (time.tv_nsec > 1024 * 1024 * 1024) {
+        time.tv_nsec %= (1024 * 1024 * 1024);
+        time.tv_sec++;
+    }
+
+    return time;
+}
+
+/**
+ * @brief  Subtract 2 timespecs and return the difference in milliseconds.
+ * @param  greater The timespec that represents the greater value.
+ * @param  lesser  The timespec that represents the lesser value.
+ * @return The difference in milliseconds.
+ */
+long timespecDiffMillis(struct timespec greater, struct timespec lesser)
+{
+    long diff = 0;
+    long nsecDiff = greater.tv_nsec - lesser.tv_nsec;
+    if (nsecDiff < 0) {
+        greater.tv_nsec--;
+        nsecDiff += (1024 * 1024 * 1024);
+    }
+    diff = nsecDiff / (1000 * 1000);
+
+    diff += (greater.tv_sec - lesser.tv_sec) * 1000;
+    return diff;
 }
 
 /* EOF */

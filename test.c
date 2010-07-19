@@ -33,8 +33,35 @@ void testSem1()
  */
 void testSem2()
 {
+    int retval = 0;
+    Semaphore sem;
     printf("=======================================\n");
+    assert(sem_init(&sem, 10) == 0);
+    // This one must succeed.
+    retval = sem_timed_op(&sem, -10, 1000);
+    assert(retval == 0);
+    // This one should time out.
+    retval = sem_timed_op(&sem, -2, 5000);
+    assert(retval != 0);
+    assert(sem_destroy(&sem) == 0);
     printf("Test testSem2 passed.\n");
+    return;
+}
+
+/**
+ * @brief Test semaphore memory.
+ */
+void testSem3()
+{
+    Semaphore sem;
+    printf("=======================================\n");
+    assert(sem_init(&sem, 1) == 0);
+    sem_down(&sem);
+    sem_up(&sem);
+    sem_up(&sem);
+    sem_op(&sem, -2);
+    assert(sem_destroy(&sem) == 0);
+    printf("Test testSem3 passed.\n");
     return;
 }
 
@@ -234,6 +261,7 @@ int main(int argc, char **argv)
 {
     testSem1();
     testSem2();
+    testSem3();
     testThreadPool1();
     testThreadPool2();
     testThreadPool3();

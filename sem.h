@@ -25,6 +25,8 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <assert.h>
+#include <errno.h>
+#include <string.h>
 
 /**
  * @def   SEMAPHORE_SUCCESS
@@ -37,6 +39,12 @@
  * @brief Denotes that an operation failed.
  */
 #define SEMAPHORE_FAILURE	-1
+
+/**
+ * @def   SEMAPHORE_TIMEOUT
+ * @brief Denotes that an operation timed out.
+ */
+#define SEMAPHORE_TIMEOUT	-2
 
 /**
  * @def   SEMAPHORE_INITIALIZED
@@ -58,6 +66,13 @@ int sem_init(Semaphore *, int);
 int sem_destroy(Semaphore *sem);
 int sem_up(Semaphore *);
 int sem_down(Semaphore *);
-int sem_timed_down(Semaphore *sem, long timeoutMillis);
+int sem_op(Semaphore *, int);
+int sem_timed_op(Semaphore *, int, long);
+int sem_up_multiple(Semaphore *, int);
+int sem_down_multiple(Semaphore *, int);
+int sem_timed_down(Semaphore *, int, long);
+int sem_timed_up(Semaphore *, int, long);
+struct timespec timeoutToTimespec(long);
+long timespecDiffMillis(struct timespec, struct timespec);
 
 #endif
