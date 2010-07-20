@@ -22,13 +22,16 @@ libpthreadext.a : pthreadExtObjs
 libpthreadext.so.1.0.1 : pthreadExtObjs
 	$(CC) -shared -Wl,-soname,libpthreadext.so.1 -o libpthreadext.so.1.0.1 *.o -lc
 
-pthreadExtObjs : sem.o threadpool.o
+pthreadExtObjs : sem.o threadpool.o mempool.o
 
 threadpool.o : threadPool.c threadPool.h sem.o
 	$(CC) $(COPTS) -o threadPool.o threadPool.c
 
 sem.o : sem.c sem.h
 	$(CC) $(COPTS) -o sem.o sem.c 
+
+mempool.o : mempool.c mempool.h
+	$(CC) $(COPTS) -o mempool.o mempool.c
 
 documentation : Doxyfile
 	doxygen Doxyfile

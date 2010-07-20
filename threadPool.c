@@ -420,5 +420,35 @@ void *worker(void *param)
     return NULL;
 }
 
+/**
+ * @brief  Create a synchronization barrier.
+ * @param  barrier The barrier to initialize.
+ * @param  numWaiters The number of threads participating in the barrier.
+ * @return 0 on success, -1 on failure.
+ */
+int createBarrier(Barrier *barrier, int numWaiters)
+{
+    return THREAD_POOL_SUCCESS;
+}
+
+/**
+ * @brief  Synchronize on a barrier.
+ * @param  barrier The barrier to synchronize on.
+ * @return 0 on success, -1 on failure.
+ */
+int barrierSync(Barrier *barrier)
+{
+    return THREAD_POOL_SUCCESS;
+}
+
+/**
+ * @brief  Destroy a barrier.
+ * @param  barrier The barrier to destroy.
+ * @return 0 on success, -1 on failure.
+ */
+int destroyBarrier(Barrier *barrier)
+{
+    return THREAD_POOL_SUCCESS;
+}
 
 /* EOF */

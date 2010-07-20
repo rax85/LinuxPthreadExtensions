@@ -101,6 +101,13 @@ typedef struct __ThreadPool {
 }ThreadPool;
 
 /**
+ * @brief A structure to represent a barrier.
+ */
+typedef struct __Barrier {
+    int numWaiters;		/**< Number of threads that can wait on this barrier */
+}Barrier;
+
+/**
  * @brief An enum to define the types of thread pools.
  */
 typedef enum __PoolType 
@@ -119,6 +126,10 @@ int threadPoolJoin(ThreadFuture *future, void **retval);
 int getFirstAvailableWorker(ThreadPool *pool);
 int signalWorker(Thread *worker);
 int addNewWorker(ThreadPool *pool);
+
+int createBarrier(Barrier *, int);
+int barrierSync(Barrier *);
+int destroyBarrier(Barrier *);
 
 void *worker(void *param);
 
