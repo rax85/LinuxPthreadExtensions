@@ -250,6 +250,70 @@ void testThreadPool5()
     return;
 }
 
+#define BARRIERTEST1_NUM_ITERATIONS	128
+#define BARRIERTEST1_NUM_THREADS	4
+char barrierOutArray[BARRIERTEST1_NUM_ITERATIONS];
+pthread_mutex_t barrierTest1Mutex;
+int barrierTest1Index;
+
+/**
+ * @brief Test function for barriers.
+ * @param arg Will hold the barrier that we need to synchronize on.
+ * @return Ignored.
+ */
+void *barrierTest(void *arg)
+{
+    int i = 0;
+    Barrier *barrier = (Barrier *)arg;
+    for(i = 0; i < BARRIERTEST1_NUM_ITERATIONS; i++) {
+        pthread_mutex_lock(&barrierTest1Mutex);
+	barrierOutArray[barrierTest1Index++] = i;
+	pthread_mutex_unlock(&barrierTest1Mutex);
+	
+	barrierSync(barrier);
+    }
+    return NULL;
+}
+
+/**
+ * @brief Test case for barriers.
+ */
+void testBarrier1()
+{
+    int i = 0;
+    int n = 0;
+    int index = 0;
+    int *retval = NULL;
+    ThreadFuture *future[BARRIERTEST1_NUM_THREADS];
+    Barrier barrier;
+
+    barrierTest1Index = 0;
+    pthread_mutex_init(&barrierTest1Mutex, NULL);
+
+    ThreadPool *pool = threadPoolInit(BARRIERTEST1_NUM_THREADS, BARRIERTEST1_NUM_THREADS, THREAD_POOL_FIXED);
+    assert(pool != NULL);
+
+    assert(0 == createBarrier(&barrier, BARRIERTEST1_NUM_THREADS));
+    printf("=======================================\n");
+
+    for (i = 0; i < BARRIERTEST1_NUM_THREADS; i++) {
+        future[i] = threadPoolExecute(pool, barrierTest, (void *)&barrier);
+        assert (future[i] != NULL);
+    }
+
+    for (i = 0; i < BARRIERTEST1_NUM_THREADS; i++) {
+        assert(0 == threadPoolJoin(future[i], (void **)&retval));
+    }
+
+    for (n = 0; n < BARRIERTEST1_NUM_ITERATIONS; n++) {
+        for (i = 0; i < BARRIERTEST1_NUM_THREADS; i++) {
+            assert(barrierOutArray[index++] == n);
+        }
+    }
+
+    printf("Test testBarrier1 passed.\n");
+    return;
+}
 
 /**
  * @brief Entry point into the test program.
@@ -267,6 +331,7 @@ int main(int argc, char **argv)
     testThreadPool3();
     testThreadPool4();
     testThreadPool5();
+    testBarrier1();
     return 0;
 }
 

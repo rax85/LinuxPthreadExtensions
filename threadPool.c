@@ -399,6 +399,7 @@ void *worker(void *param)
 	future = workItem->future;
         future->result = retval;
 	sem_up(&future->resultAvailable);
+	free(workItem);
 
 	// Finally, mark this thread as available.
         if (0 != pthread_mutex_lock(&parent->avlblMutex)) {
@@ -428,16 +429,79 @@ void *worker(void *param)
  */
 int createBarrier(Barrier *barrier, int numWaiters)
 {
+    if (barrier == NULL || numWaiters == 0) {
+        return THREAD_POOL_FAILURE;
+    }
+
+    barrier->numWaiters = numWaiters;
+    barrier->barrierFlag = 0;
+    barrier->numArrived = 0;
+
+    if (0 != pthread_mutex_init(&barrier->barrierMutex, NULL)) {
+        return THREAD_POOL_FAILURE;
+    }
+
+    if (0 != pthread_cond_init(&barrier->barrierCvar, NULL)) {
+        pthread_mutex_destroy(&barrier->barrierMutex);
+        return THREAD_POOL_FAILURE;
+    }
+
     return THREAD_POOL_SUCCESS;
 }
 
 /**
- * @brief  Synchronize on a barrier.
+ * @brief  Synchronize on a barrier. This is an implementation of a centralized
+ *         barrier algorithm _without_ busy waiting. This might be a good match
+ *         for cases where the number of threads oversubscribes the number of 
+ *         cores. More advanced barrier algorithms will probably be added sometime
+ *         in the future.
  * @param  barrier The barrier to synchronize on.
  * @return 0 on success, -1 on failure.
  */
 int barrierSync(Barrier *barrier)
 {
+    int barrierFlag = 0;
+
+    if (barrier == NULL) {
+        return THREAD_POOL_FAILURE;
+    }
+
+    // Save the local barrier flag first.
+    barrierFlag = barrier->barrierFlag;
+
+    // Now atomically increment the number of waiters.
+    if (0 != pthread_mutex_lock(&barrier->barrierMutex)) { return THREAD_POOL_FAILURE; }
+    barrier->numArrived++;
+
+    if (barrier->numArrived == barrier->numWaiters) {
+        // All of the threads have arrived, reset the number of threads arrived.
+	barrier->numArrived = 0;
+
+	// Now flip the barrier flag. See the function documentation for an explanation.
+	barrier->barrierFlag = !barrierFlag;
+
+	// Now make everyone runnable.
+	if (0 != pthread_cond_broadcast(&barrier->barrierCvar)) {
+            return THREAD_POOL_FAILURE;
+	}
+
+        // Finally drop the mutex and lets go on with life.
+	if (0 != pthread_mutex_unlock(&barrier->barrierMutex)) { 
+	    return THREAD_POOL_FAILURE; 
+	}
+    } else {
+        // This condition is true as long as all the threads havent arrived. Till
+	// then keep waiting on the cvar.
+	while (barrierFlag == barrier->barrierFlag) {
+	    pthread_cond_wait(&barrier->barrierCvar, &barrier->barrierMutex);
+	}
+        
+	// The cvar granted you the mutex, promptly drop it.
+	if (0 != pthread_mutex_unlock(&barrier->barrierMutex)) {
+            return THREAD_POOL_FAILURE;
+	}
+    }
+
     return THREAD_POOL_SUCCESS;
 }
 
@@ -448,6 +512,13 @@ int barrierSync(Barrier *barrier)
  */
 int destroyBarrier(Barrier *barrier)
 {
+    if (barrier == NULL) {
+        return THREAD_POOL_FAILURE;
+    }
+    
+    pthread_cond_destroy(&barrier->barrierCvar);
+    pthread_mutex_destroy(&barrier->barrierMutex);
+
     return THREAD_POOL_SUCCESS;
 }
 

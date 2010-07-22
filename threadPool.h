@@ -104,7 +104,11 @@ typedef struct __ThreadPool {
  * @brief A structure to represent a barrier.
  */
 typedef struct __Barrier {
-    int numWaiters;		/**< Number of threads that can wait on this barrier */
+    int numWaiters;		  /**< Max threads that can wait on this barrier */
+    int numArrived;		  /**< Number of threads that have arrived */
+    int barrierFlag;		  /**< Toggles whenever all threads arrive. */
+    pthread_mutex_t barrierMutex; /**< Mutex to protect the barrier count. */
+    pthread_cond_t barrierCvar;	  /**< Cvar for threads to wait on. */
 }Barrier;
 
 /**
