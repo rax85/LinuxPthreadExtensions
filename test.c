@@ -6,8 +6,11 @@
 
 #include "threadPool.h"
 #include "sem.h"
+#include "mempool.h"
 #include <assert.h>
 
+
+//------------------------------- Semaphore Tests -----------------------------
 /**
  * @brief Sanity check for semaphores. Thread pools internally use
  *        semaphores heavily so those there aren't many tests for
@@ -65,6 +68,7 @@ void testSem3()
     return;
 }
 
+//------------------------------ Thread pool Tests ----------------------------
 
 int sanityCounter = 0; /**< A stupid way to count the number of executions. */
 
@@ -250,11 +254,22 @@ void testThreadPool5()
     return;
 }
 
+//--------------------------------- Barrier Tests -----------------------------
+
+/**
+ * @def BARRIERTEST1_NUM_ITERATIONS
+ * @brief Number of iterations that each thread will make in barrierTest.
+ */
 #define BARRIERTEST1_NUM_ITERATIONS	128
+/**
+ * @def BARRIERTEST1_NUM_THREADS
+ * @brief Number of threads in barrierTest1
+ */
 #define BARRIERTEST1_NUM_THREADS	4
-char barrierOutArray[BARRIERTEST1_NUM_ITERATIONS];
-pthread_mutex_t barrierTest1Mutex;
-int barrierTest1Index;
+
+char barrierOutArray[BARRIERTEST1_NUM_ITERATIONS]; /**< Output array for barrierTest1 threads. */
+pthread_mutex_t barrierTest1Mutex;  /**< Mutex to protect barrierOutArray */
+int barrierTest1Index;   /**< Current index to write to in barrierOutArray */
 
 /**
  * @brief Test function for barriers.
@@ -315,6 +330,41 @@ void testBarrier1()
     return;
 }
 
+
+//---------------------------- fixed mem pool Tests ---------------------------
+
+/**
+ * @brief Sanity test for fixed sized memory pools.
+ */
+void testFixedMemPool1()
+{
+    MempoolFixed pool;
+    char *object1;
+    char *object2;
+
+    printf("=======================================\n");
+    assert(0 == mempool_create_fixed_pool(&pool, 64, 2, MEMPOOL_UNPROTECTED));
+    object1 = mempool_fixed_alloc(&pool);
+    assert(object1 != NULL);
+    memset(object1, 0, 64);
+    
+    object2 = mempool_fixed_alloc(&pool);
+    assert(object2 != NULL);
+    memset(object2, 1, 64);
+
+    assert(NULL == mempool_fixed_alloc(&pool));
+    assert(0 == mempool_fixed_free(object1));
+    assert(0 == mempool_fixed_free(object2));
+
+    assert(NULL != mempool_fixed_alloc(&pool));
+    assert(NULL != mempool_fixed_alloc(&pool));
+    assert(NULL == mempool_fixed_alloc(&pool));
+
+    assert(0 == mempool_destroy_fixed_pool(&pool));
+    printf("Test testFixedMemPool1 passed.\n");
+    return;
+}
+
 /**
  * @brief Entry point into the test program.
  * @param argc Number of arguments.
@@ -332,6 +382,7 @@ int main(int argc, char **argv)
     testThreadPool4();
     testThreadPool5();
     testBarrier1();
+    testFixedMemPool1();
     return 0;
 }
 

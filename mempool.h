@@ -53,10 +53,32 @@
 #define MEMPOOL_UNPROTECTED		3	
 
 /**
+ * @def   MEMPOOL_FIXED_MAGIC
+ * @brief Magic number to verify the integrity of a fixed pool.
+ */
+#define MEMPOOL_FIXED_MAGIC		0xdecaf123
+/**
+ * @def   MEMPOOL_VARIABLE_MAGIC
+ * @brief Magic number to verify the integrity of a variable pool.
+ */
+#define MEMPOOL_VARIABLE_MAGIC		0xc0ffee12
+
+/**
+ * @def   MEMPOOL_PER_OBJECT_OVERHEAD
+ * @brief How much memory is needed for metadata for each object in a fixed pool.
+ */
+#define MEMPOOL_PER_OBJECT_OVERHEAD	(sizeof (void *))
+
+/**
  * @brief A struct to represent a memory pool of fixed sized objects.
  */
 typedef struct __MempoolFixed {
     pthread_mutex_t *poolMutex;		/**< A mutex to protect the pool if needed. */
+    void *pool;				/**< The actual memory pool. */
+    void *freeList;			/**< List of free nodes. */
+    long poolSize;			/**< Size of the actual memory pool. */
+    unsigned int storedObjectSize;	/**< Object size + overhead */
+    int magic;				/**< Enables a simple integrity check. */
 }MempoolFixed;
 
 /**
@@ -64,6 +86,9 @@ typedef struct __MempoolFixed {
  */
 typedef struct __MempoolVariable {
     pthread_mutex_t *poolMutex;		/**< A mutex to protect the pool if needed. */
+    void *pool;				/**< The actual memory pool. */
+    long poolSize;			/**< The size of the actual pool. */
+    int magic;				/**< Enables a simple integrity check. */
 }MempoolVariable;
 
 int mempool_create_fixed_pool(MempoolFixed *, int, int, int);
