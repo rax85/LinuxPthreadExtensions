@@ -54,6 +54,8 @@ int mempool_create_fixed_pool(MempoolFixed *pool,
         if (0 != pthread_mutex_init(pool->poolMutex, NULL)) {
 	    goto cfpool_destroy1;
 	}
+    } else {
+        pool->poolMutex = NULL;
     }
 
     // Get all the memory needed up front.
@@ -83,7 +85,7 @@ int mempool_create_fixed_pool(MempoolFixed *pool,
 
     return MEMPOOL_SUCCESS;
 
-cfpool_destroy2: pthread_mutex_destroy(pool->poolMutex);
+cfpool_destroy2: if (pool->poolMutex != NULL) { pthread_mutex_destroy(pool->poolMutex); }
 cfpool_destroy1: free(pool->poolMutex);
     return MEMPOOL_FAILURE;
 }
