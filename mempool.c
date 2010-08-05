@@ -32,7 +32,7 @@
  * @return 0 on success, -1 on failure.
  */
 int mempool_create_fixed_pool(MempoolFixed *pool, 
-                              int objectSize, 
+                              long objectSize, 
                               int numObjects, 
                               int protected)
 {
@@ -208,11 +208,46 @@ int mempool_destroy_fixed_pool(MempoolFixed *pool)
  * @param  protected Should the pool be protected by a mutex?
  * @return 0 on success, -1 on failure.
  */
-int mempool_create_variable_pool(MempoolVariable *pool, int size, int protected)
+int mempool_create_variable_pool(MempoolVariable *pool, long size, int protected)
 {
+    long *blockMetadata = NULL;
+
     if (pool == NULL) {
         return MEMPOOL_FAILURE;
     }
+
+    if (protected == MEMPOOL_PROTECTED) {
+        pool->poolMutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+	if (pool->poolMutex == NULL) {
+	    return MEMPOOL_FAILURE;
+	}
+     
+        if (0 != pthread_mutex_init(pool->poolMutex, NULL)) {
+	    free(pool->poolMutex);
+	    return MEMPOOL_FAILURE;
+	}
+    } else {
+        pool->poolMutex = NULL;
+    }
+
+    pool->pool = malloc(size);
+    if (pool->pool == NULL) {
+        if (NULL != pool->poolMutex) {
+	    pthread_mutex_destroy(pool->poolMutex);
+	    return MEMPOOL_FAILURE;
+	}
+    }
+    pool->poolSize = size;
+    pool->freeList = pool->pool;
+
+    // Set up the block metadata.
+    blockMetadata = (long *)pool->freeList;
+    blockMetadata[VPMD_SIZE_OFFSET] = pool->poolSize;
+    blockMetadata[VPMD_PREV_OFFSET] = 0; // NULL the prev pointer.
+    blockMetadata[VPMD_NEXT_OFFSET] = 0; // NULL the next pointer.
+    
+    // Finally, set the flag to indicate that this pool is valid.
+    pool->magic = MEMPOOL_VARIABLE_MAGIC;
 
     return MEMPOOL_SUCCESS;
 }
@@ -223,9 +258,10 @@ int mempool_create_variable_pool(MempoolVariable *pool, int size, int protected)
  * @param  size The size of the object to allocate.
  * @return A valid address on success, NULL on failure.
  */
-void *mempool_variable_alloc(MempoolVariable *pool, int size)
+void *mempool_variable_alloc(MempoolVariable *pool, long size)
 {
-    void *addr = NULL;
+    void *candidateBlock = NULL;
+    int unlockNeeded = 0;
     
     if (pool == NULL) {
         return NULL;
@@ -236,9 +272,37 @@ void *mempool_variable_alloc(MempoolVariable *pool, int size)
         if (0 != pthread_mutex_lock(pool->poolMutex)) {
 	    return NULL;
 	}
+	unlockNeeded = 1;
     }
 
+    // First off, adjust the size to accomodate the metadata.
+    size += MEMPOOL_PER_BLOCK_OVERHEAD;
+    if (size < 3 * sizeof(long)) {
+        // Because this should be linkable back into the list.
+	size = 3 * sizeof(long);
+    }
+
+    // Find the first fit block from the free list.
+    candidateBlock = findFirstFit(pool, size);
+    if (candidateBlock == NULL) {
+        if (unlockNeeded) {
+	    pthread_mutex_unlock(pool->poolMutex);
+	}
+        return NULL;
+    }
     
+    // Split the block and re-link the free list.
+    candidateBlock = splitBlock(pool, candidateBlock, &size);
+    if (candidateBlock == NULL) {
+        if (unlockNeeded) {
+	    pthread_mutex_lock(pool->poolMutex);
+	}
+	return NULL;
+    }
+
+    // Prep the block for return.
+    ((long *)candidateBlock)[0] = (long)pool;
+    ((long *)candidateBlock)[1] = size;
 
     // Unlock the mutex if needed.
     if (pool->poolMutex != NULL) {
@@ -247,7 +311,8 @@ void *mempool_variable_alloc(MempoolVariable *pool, int size)
 	}
     }
 
-    return addr;
+    // &candidateBlock[2] is the start of the user memory block.
+    return &(((long *)candidateBlock)[2]);
 }
 
 /**
@@ -257,11 +322,22 @@ void *mempool_variable_alloc(MempoolVariable *pool, int size)
  */
 int mempool_variable_free(void *addr)
 {
+    MempoolVariable *pool = NULL;
+    long size = 0;
+    long *originalBlock = (long *)addr;
+
     if (addr == NULL) {
         return MEMPOOL_FAILURE;
     }
 
-#if 0
+    // Find the pool that this block points to & the size of the block.
+    originalBlock -= 2;
+    pool = (MempoolVariable *)originalBlock[0];
+    size = originalBlock[1];
+    if (pool->magic != MEMPOOL_VARIABLE_MAGIC) {
+        return MEMPOOL_FAILURE;
+    }
+
     // Lock the mutex if needed.
     if (pool->poolMutex != NULL) {
         if (0 != pthread_mutex_lock(pool->poolMutex)) {
@@ -269,7 +345,8 @@ int mempool_variable_free(void *addr)
 	}
     }
 
-    
+    // Add the block back into the free list.
+    insertIntoFreeList(pool, (void *)originalBlock);
 
     // Unlock the mutex if needed.
     if (pool->poolMutex != NULL) {
@@ -277,7 +354,6 @@ int mempool_variable_free(void *addr)
 	    return MEMPOOL_FAILURE;
 	}
     }
-#endif
  
     return MEMPOOL_SUCCESS;
 }
@@ -289,11 +365,227 @@ int mempool_variable_free(void *addr)
  */
 int mempool_destroy_variable_pool(MempoolVariable *pool)
 {
-    if (pool == NULL) {
+    if (pool == NULL || pool->magic != MEMPOOL_VARIABLE_MAGIC || pool->pool == NULL) {
         return MEMPOOL_FAILURE;
+    }
+
+    free(pool->pool);
+    
+    if (pool->poolMutex != NULL) {
+        pthread_mutex_destroy(pool->poolMutex);
+	free(pool->poolMutex);
     }
 
     return MEMPOOL_SUCCESS;
 }
 
+/**
+ * @brief Find the first block in the free list that can satisfy the request.
+ * @param pool The pool to search.
+ * @param size The size of block to search for.
+ * @return The address of the first block that fits, NULL if no fit present.
+ */
+static void *findFirstFit(MempoolVariable *pool, long size)
+{
+    void *firstFit = NULL;
+    long *blockMetadata = NULL;
+    void *currentBlock = pool->freeList;
+
+    while (currentBlock != NULL) {
+        blockMetadata = (long *)currentBlock;
+	
+	// Does this block fit the request?
+	if (size <= blockMetadata[VPMD_SIZE_OFFSET]) {
+	    firstFit = currentBlock;
+	    break;
+	}
+
+	currentBlock = (void *)blockMetadata[VPMD_NEXT_OFFSET];
+    }
+
+    return firstFit;
+}
+
+/**
+ * @brief Split the block and put the remainder back into the list.
+ * @param pool The pool that this block belongs to.
+ * @param addr The address of the block to split.
+ * @param requestSize The desired size of block to retrieve.
+ * @return The address of the allocated block to return to the caller.
+ */
+static void *splitBlock(MempoolVariable *pool, void *addr, long *requestSize)
+{
+    void *allocatedBlock = NULL;
+    long *blockMetadata= (long *)addr;
+    long blockSize = blockMetadata[VPMD_SIZE_OFFSET];
+    long *prevBlock = NULL;
+    long *nextBlock = NULL;
+    long size = *requestSize;
+
+    // Ensure that the remaining block has space atleast one allocation, 
+    // if not, just send it along with allocated data block.
+    if ((blockSize - size) < (4 * sizeof(long))) {
+        size = blockSize;
+    }
+
+    if (blockSize == size) {
+        // Unlink the block.
+	allocatedBlock = addr;
+        prevBlock = (long *)blockMetadata[VPMD_PREV_OFFSET];
+        nextBlock = (long *)blockMetadata[VPMD_NEXT_OFFSET];
+
+	if (prevBlock != NULL) {
+	    // Current block is not the head of the list.
+	    
+	    // Point the prev block's next pointer to the current block's next.
+	    prevBlock[VPMD_NEXT_OFFSET] = (long)nextBlock;
+
+	    // If the current block is not the tail of the list, make its next
+	    // blocks backpointer point its prev block.
+	    if (nextBlock != NULL) {
+	        nextBlock[VPMD_PREV_OFFSET] = (long)prevBlock;
+	    }
+	} else {
+	    // Current block is the head of the list.
+
+	    // Point the free list head pointer to the next block.
+	    pool->freeList = (void *)nextBlock;
+	    
+	    // If the current block is not the tail of the list null out the prev
+	    // pointer of the next block.
+	    if (nextBlock != NULL) {
+	        nextBlock[VPMD_PREV_OFFSET] = 0;
+	    }
+	}
+    } else {
+        // Just reduce the size of the block.
+	blockMetadata[VPMD_SIZE_OFFSET] = blockSize - size;
+	allocatedBlock = (void *)((long)addr + (blockSize - size));
+    }
+
+    // Update the size of the requested block just in case we grew it.
+    *requestSize = size;
+    return allocatedBlock;
+}
+
+
+/**
+ * @brief Insert a block back into the free list, which is ordered by address.
+ * @param pool The pool to add the block to.
+ * @param addr The address to add into the free list.
+ */
+static void insertIntoFreeList(MempoolVariable *pool, void *addr)
+{
+    long *listHead = (long *)pool->freeList;
+    long *insertBefore = (long *)pool->freeList;
+    long *prev = NULL;
+    long *current = (long *)addr;
+    long *next = NULL;
+    int insertAfterInstead = 0;
+
+    if (listHead == NULL) {
+        // Simple case, this block is the new head.
+	current[VPMD_NEXT_OFFSET] = 0;
+	listHead = current;
+    } else {
+        // Block needs to be inserted into the list.
+	listHead = (listHead > current) ? current : listHead;
+	
+	// First, find the node that it needs to be inserted before.
+	insertBefore = listHead;
+        while (insertBefore < current) {
+	   // Make sure we dont run off the end of the list.
+	   if (insertBefore[VPMD_NEXT_OFFSET] == 0) {
+	       insertAfterInstead = 1;
+	       break;
+	   }
+           // Keep traversing otherwise.
+	   insertBefore = (long *)(insertBefore[VPMD_NEXT_OFFSET]);
+        }
+
+	// Now actually insert the node before or after the node.
+	if (insertAfterInstead) {
+	    insertAfter(insertBefore, current);
+	} else {
+	    insertAfter(current, insertBefore);
+	}
+    }
+
+    // If the head of the list has changed, update the free list pointer.
+    if (pool->freeList != listHead) {
+       pool->freeList = (void *)listHead;
+       listHead[VPMD_PREV_OFFSET] = 0;
+    }
+
+    // Finally, call coalesce to minimize fragmentation.
+    prev = (long *)current[VPMD_PREV_OFFSET];
+    next = (long *)current[VPMD_NEXT_OFFSET];
+    coalesceBlocks(prev, current, next);
+
+    return;
+}
+
+/**
+ * @brief Insert one block after another.
+ * @param prev The block to insert after.
+ * @param blockToInsert The block to insert.
+ */
+static void insertAfter(long *prev, long *blockToInsert)
+{
+    long *next = (long *)prev[VPMD_NEXT_OFFSET];
+
+    prev[VPMD_NEXT_OFFSET] = (long)blockToInsert;
+    blockToInsert[VPMD_PREV_OFFSET] = (long)prev;
+
+    blockToInsert[VPMD_NEXT_OFFSET] = (long)next;
+    if (next != NULL) {
+        next[VPMD_PREV_OFFSET] = (long)blockToInsert;
+    }
+
+    return;
+}
+
+/**
+ * @brief Coalesce the free list into larger blocks.
+ * @param prev The previous block in the free list.
+ * @param current The block to coalesce.
+ * @param next The next block in the free list.
+ */
+static void coalesceBlocks(long *prev, long *current, long *next)
+{
+    if (next != NULL) {
+        coalesce(current, next); 
+    }
+
+    if (prev != NULL) {
+        coalesce(prev, current);
+    }
+
+    return;
+}
+
+/**
+ * @brief Coalesce this block with the next one.
+ * @param current The block to coalesce.
+ * @param next The block to coalesce with.
+ */
+static void coalesce(long *current, long *next)
+{
+    unsigned long currentAddr = (long)current;
+    unsigned long nextAddr = (long)next;
+    long *nextNext = (long *)next[VPMD_NEXT_OFFSET];
+
+    if (currentAddr + current[VPMD_SIZE_OFFSET] == nextAddr) {
+        // First, adjust the size.
+        current[VPMD_SIZE_OFFSET] += next[VPMD_SIZE_OFFSET];
+
+	// Next, adjust the links.
+	current[VPMD_NEXT_OFFSET] = (long)nextNext;
+	if (nextNext != NULL) {
+	    nextNext[VPMD_PREV_OFFSET] = (long)current;
+	}
+    }
+
+    return;
+}
 

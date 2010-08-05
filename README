@@ -19,7 +19,7 @@ I. This is a list of currently available and planned functionality:
     
     3. Memory pools
         - Memory pools with support for fixed sized allocation are implemented and minimally tested.
-        - Memory pools with support for variable sized allocation [Planned].
+        - Memory pools with support for variable sized allocation [Coded - Untested].
 
 II. Building.
     - 'make' builds the library.

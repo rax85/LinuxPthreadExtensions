@@ -70,6 +70,30 @@
 #define MEMPOOL_PER_OBJECT_OVERHEAD	(sizeof (void *))
 
 /**
+ * @def   MEMPOOL_PER_BLOCK_OVERHEAD	
+ * @brief How much memory is needed for metadata for each block in a variable pool.
+ */
+#define MEMPOOL_PER_BLOCK_OVERHEAD	(2 * sizeof(long))
+
+/**
+ * @def   VPMD_SIZE_OFFSET 
+ * @brief Offset of the size in the free list block.
+ */
+#define VPMD_SIZE_OFFSET	0
+
+/**
+ * @def   VPMD_PREV_OFFSET
+ * @brief Offset of the previous pointer in the free list block.
+ */
+#define VPMD_PREV_OFFSET	1
+
+/**
+ * @def   VPMD_NEXT_OFFSET
+ * @brief Index of the next pointer in the free list block.
+ */
+#define VPMD_NEXT_OFFSET	2
+
+/**
  * @brief A struct to represent a memory pool of fixed sized objects.
  */
 typedef struct __MempoolFixed {
@@ -77,9 +101,21 @@ typedef struct __MempoolFixed {
     void *pool;				/**< The actual memory pool. */
     void *freeList;			/**< List of free nodes. */
     long poolSize;			/**< Size of the actual memory pool. */
-    unsigned int storedObjectSize;	/**< Object size + overhead */
+    long storedObjectSize;		/**< Object size + overhead */
     int magic;				/**< Enables a simple integrity check. */
 }MempoolFixed;
+
+
+/*
+ * Structure of the free list.
+ *                                 |----------------------------+
+ *             +---------------+   +-----+----+----+    +-----+-+--+----+
+ * freeList--->|blkSz|NULL|next+-->|blkSz|prev|next+--> |blkSz|prev|NULL|
+ *             +-----+----+----+   +-----+-+--+----+    +-----+----+----+
+ *             |---------------------------+
+ *
+ * > Each node is sizeof(long) + sizeof(long) + sizeof(long).
+ */
 
 /**
  * @brief A struct to represent a memory pool of variable sized objects.
@@ -88,17 +124,25 @@ typedef struct __MempoolVariable {
     pthread_mutex_t *poolMutex;		/**< A mutex to protect the pool if needed. */
     void *pool;				/**< The actual memory pool. */
     long poolSize;			/**< The size of the actual pool. */
+    void *freeList;			/**< List of free blocks. */
     int magic;				/**< Enables a simple integrity check. */
 }MempoolVariable;
 
-int mempool_create_fixed_pool(MempoolFixed *, int, int, int);
+int mempool_create_fixed_pool(MempoolFixed *, long, int, int);
 void *mempool_fixed_alloc(MempoolFixed *);
 int mempool_fixed_free(void *);
 int mempool_destroy_fixed_pool(MempoolFixed *);
 
-int mempool_create_variable_pool(MempoolVariable *, int, int);
-void *mempool_variable_alloc(MempoolVariable *, int);
+int mempool_create_variable_pool(MempoolVariable *, long, int);
+void *mempool_variable_alloc(MempoolVariable *, long);
 int mempool_variable_free(void *);
 int mempool_destroy_variable_pool(MempoolVariable *);
+
+static void *findFirstFit(MempoolVariable *, long);
+static void *splitBlock(MempoolVariable *, void *, long *);
+static void insertIntoFreeList(MempoolVariable *, void *);
+static void insertAfter(long *, long *);
+static void coalesceBlocks(long *, long *, long *);
+static void coalesce(long *, long *);
 
 #endif
