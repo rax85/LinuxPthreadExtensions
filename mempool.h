@@ -142,6 +142,7 @@ static void *findFirstFit(MempoolVariable *, long);
 static void *splitBlock(MempoolVariable *, void *, long *);
 static void insertIntoFreeList(MempoolVariable *, void *);
 static void insertAfter(long *, long *);
+static void insertBefore(long *, long *);
 static void coalesceBlocks(long *, long *, long *);
 static void coalesce(long *, long *);
 

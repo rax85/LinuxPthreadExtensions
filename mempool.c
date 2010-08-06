@@ -116,8 +116,8 @@ void *mempool_fixed_alloc(MempoolFixed *pool)
     if (object == NULL) {
         if (pool->poolMutex != NULL) {
 	    pthread_mutex_unlock(pool->poolMutex);
-	    return NULL;
 	}
+	return NULL;
     }
 
     // Ok, got an onject to return, update the free list to point to the next object.
@@ -230,10 +230,13 @@ int mempool_create_variable_pool(MempoolVariable *pool, long size, int protected
         pool->poolMutex = NULL;
     }
 
+    // Allocate all the memory up front.
+    size += MEMPOOL_PER_BLOCK_OVERHEAD;
     pool->pool = malloc(size);
     if (pool->pool == NULL) {
         if (NULL != pool->poolMutex) {
 	    pthread_mutex_destroy(pool->poolMutex);
+	    free(pool->poolMutex);
 	    return MEMPOOL_FAILURE;
 	}
     }
@@ -279,7 +282,7 @@ void *mempool_variable_alloc(MempoolVariable *pool, long size)
     size += MEMPOOL_PER_BLOCK_OVERHEAD;
     if (size < 3 * sizeof(long)) {
         // Because this should be linkable back into the list.
-	size = 3 * sizeof(long);
+	size += 3 * sizeof(long);
     }
 
     // Find the first fit block from the free list.
@@ -346,6 +349,7 @@ int mempool_variable_free(void *addr)
     }
 
     // Add the block back into the free list.
+    originalBlock[VPMD_SIZE_OFFSET] = size;
     insertIntoFreeList(pool, (void *)originalBlock);
 
     // Unlock the mutex if needed.
@@ -477,7 +481,7 @@ static void *splitBlock(MempoolVariable *pool, void *addr, long *requestSize)
 static void insertIntoFreeList(MempoolVariable *pool, void *addr)
 {
     long *listHead = (long *)pool->freeList;
-    long *insertBefore = (long *)pool->freeList;
+    long *node = (long *)pool->freeList;
     long *prev = NULL;
     long *current = (long *)addr;
     long *next = NULL;
@@ -492,22 +496,22 @@ static void insertIntoFreeList(MempoolVariable *pool, void *addr)
 	listHead = (listHead > current) ? current : listHead;
 	
 	// First, find the node that it needs to be inserted before.
-	insertBefore = listHead;
-        while (insertBefore < current) {
+	node = listHead;
+        while (node < current) {
 	   // Make sure we dont run off the end of the list.
-	   if (insertBefore[VPMD_NEXT_OFFSET] == 0) {
+	   if (node[VPMD_NEXT_OFFSET] == 0) {
 	       insertAfterInstead = 1;
 	       break;
 	   }
            // Keep traversing otherwise.
-	   insertBefore = (long *)(insertBefore[VPMD_NEXT_OFFSET]);
+	   node = (long *)(node[VPMD_NEXT_OFFSET]);
         }
 
 	// Now actually insert the node before or after the node.
 	if (insertAfterInstead) {
-	    insertAfter(insertBefore, current);
+	    insertAfter(node, current);
 	} else {
-	    insertAfter(current, insertBefore);
+	    insertBefore(node, current);
 	}
     }
 
@@ -542,6 +546,23 @@ static void insertAfter(long *prev, long *blockToInsert)
         next[VPMD_PREV_OFFSET] = (long)blockToInsert;
     }
 
+    return;
+}
+
+/**
+ * @brief Insert a block before the specified one.
+ * @param after The block to insert before.
+ * @param blockToInsert The block to insert.
+ */
+static void insertBefore(long *after, long *blockToInsert)
+{
+    long *prev = (long *)after[VPMD_PREV_OFFSET];
+
+    prev[VPMD_NEXT_OFFSET] = (long)blockToInsert;
+    blockToInsert[VPMD_PREV_OFFSET] = (long)prev;
+
+    after[VPMD_PREV_OFFSET] = (long)blockToInsert;
+    blockToInsert[VPMD_NEXT_OFFSET] = (long)after;
     return;
 }
 

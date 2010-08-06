@@ -334,7 +334,7 @@ void testBarrier1()
 //---------------------------- fixed mem pool Tests ---------------------------
 
 /**
- * @brief Sanity test for fixed sized memory pools.
+ * @brief Sanity test for the unprotected fixed sized memory pools.
  */
 void testFixedMemPool1()
 {
@@ -366,6 +366,108 @@ void testFixedMemPool1()
 }
 
 /**
+ * @brief Sanity check the protected fixed sized memory pools.
+ */
+void testFixedMemPool2()
+{
+    MempoolFixed pool;
+    char *object1;
+    char *object2;
+
+    printf("=======================================\n");
+    assert(0 == mempool_create_fixed_pool(&pool, 64, 2, MEMPOOL_PROTECTED));
+    object1 = mempool_fixed_alloc(&pool);
+    assert(object1 != NULL);
+    memset(object1, 0, 64);
+    
+    object2 = mempool_fixed_alloc(&pool);
+    assert(object2 != NULL);
+    memset(object2, 1, 64);
+
+    assert(NULL == mempool_fixed_alloc(&pool));
+    assert(0 == mempool_fixed_free(object1));
+    assert(0 == mempool_fixed_free(object2));
+
+    assert(NULL != mempool_fixed_alloc(&pool));
+    assert(NULL != mempool_fixed_alloc(&pool));
+    assert(NULL == mempool_fixed_alloc(&pool));
+
+    assert(0 == mempool_destroy_fixed_pool(&pool));
+    printf("Test testFixedMemPool2 passed.\n");
+}
+
+
+
+//---------------------------- fixed mem pool Tests ---------------------------
+
+/**
+ * @brief Sanity test for unprotected variable sized memory pools.
+ */
+void testVariableMemPool1()
+{
+    MempoolVariable pool;
+    char *object1 = NULL;
+    char *object2 = NULL;
+    long sixM = 6L * 1024L * 1024L;
+
+    printf("=======================================\n");
+    assert(0 == mempool_create_variable_pool(&pool, sixM, MEMPOOL_UNPROTECTED));
+
+    object1 = mempool_variable_alloc(&pool, 64);
+    assert(NULL != object1);
+    memset(object1, 1, 64);
+
+    object2 = mempool_variable_alloc(&pool, 128);
+    assert(NULL != object2);
+    memset(object2, 2, 128);
+
+    assert(0 == mempool_variable_free(object1));
+    assert(0 == mempool_variable_free(object2));
+
+    object1 = mempool_variable_alloc(&pool, sixM);
+    assert(NULL != object1);
+    memset(object1, 3, sixM);
+    assert(0 == mempool_variable_free(object1));
+
+    assert(0 == mempool_destroy_variable_pool(&pool));
+    printf("Test testVariableMemPool1 passed.\n");
+}
+
+/**
+ * @brief Sanity test for protected variable sized memory pools.
+ */
+void testVariableMemPool2()
+{
+    MempoolVariable pool;
+    char *object1 = NULL;
+    char *object2 = NULL;
+    long sixM = 6L * 1024L * 1024L;
+
+    printf("=======================================\n");
+    assert(0 == mempool_create_variable_pool(&pool, sixM, MEMPOOL_PROTECTED));
+
+    object1 = mempool_variable_alloc(&pool, 64);
+    assert(NULL != object1);
+    memset(object1, 1, 64);
+
+    object2 = mempool_variable_alloc(&pool, 128);
+    assert(NULL != object2);
+    memset(object2, 2, 128);
+
+    assert(0 == mempool_variable_free(object1));
+    assert(0 == mempool_variable_free(object2));
+
+    object1 = mempool_variable_alloc(&pool, sixM);
+    assert(NULL != object1);
+    memset(object1, 3, sixM);
+    assert(0 == mempool_variable_free(object1));
+
+    assert(0 == mempool_destroy_variable_pool(&pool));
+    printf("Test testVariableMemPool2 passed.\n");
+}
+
+
+/**
  * @brief Entry point into the test program.
  * @param argc Number of arguments.
  * @param argv Array of pointers to arguments.
@@ -383,6 +485,9 @@ int main(int argc, char **argv)
     testThreadPool5();
     testBarrier1();
     testFixedMemPool1();
+    testFixedMemPool2();
+    testVariableMemPool1();
+    testVariableMemPool2();
     return 0;
 }
 
