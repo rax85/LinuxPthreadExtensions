@@ -5,7 +5,11 @@ Linux PThread Extensions.
 This library provides some functionality that I thought would be a nice
 addition to the stock pthread library. 
 
-I. This is a list of currently available and planned functionality:
+I. NEWS!
+    - Aug 08 2010 : Ran the test code under valgrind to check for memory leaks. As of now, 
+      valgrind does not report any memory leaks.
+
+II. This is a list of currently available and planned functionality:
     1. Thread Pools.
         - Fixed sized thread pools are minimally tested.
         - Variable sized thread pools are minimally tested.
@@ -21,13 +25,13 @@ I. This is a list of currently available and planned functionality:
         - Memory pools with support for fixed sized allocation are implemented and minimally tested.
         - Memory pools with support for variable sized allocation is now coded and minimally tested.
 
-II. Building.
+III. Building.
     - 'make' builds the library.
     - 'make documentation' builds doxygen documentation. You need doxygen for this
       target to build.
     - 'make test' builds test.out a binary that runs a few simple tests.
 
-III. Linking notes.
+IV. Linking notes.
     - While linking against your program, be sure to also link against -lpthread and -lrt
 
 Keep checking back for developments!

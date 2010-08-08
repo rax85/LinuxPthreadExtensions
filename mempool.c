@@ -194,6 +194,7 @@ int mempool_destroy_fixed_pool(MempoolFixed *pool)
 
     if (pool->poolMutex != NULL) {
         pthread_mutex_destroy(pool->poolMutex);
+        free(pool->poolMutex);
     }
 
     free(pool->pool);

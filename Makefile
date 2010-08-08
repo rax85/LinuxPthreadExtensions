@@ -5,7 +5,7 @@
 ##
 
 CC=gcc
-COPTS=-g -Wall -fpic -c
+COPTS=-g -O0 -Wall -fpic -c
 AR=ar
 AROPTS=rcs
 

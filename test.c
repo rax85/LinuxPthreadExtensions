@@ -82,6 +82,7 @@ void *threadWorker1(void *arg)
     int *value = (int *)malloc(sizeof(int));
     *value = *((int *)arg);
     sanityCounter++;
+    free(arg);
     printf("Worker %d executed\n", *value);
     return value;
 }
@@ -92,7 +93,7 @@ void *threadWorker1(void *arg)
 void testThreadPool1()
 {
     int i = 0;
-    int arg = 42;
+    int *arg = NULL;
     int *retval = NULL;
     ThreadFuture *future = NULL;
     ThreadPool *pool = threadPoolInit(1, 1, THREAD_POOL_FIXED);
@@ -100,12 +101,13 @@ void testThreadPool1()
     printf("=======================================\n");
 
     for (i = 1; i <= 42; i++) {
-        arg = i;
-        future = threadPoolExecute(pool, threadWorker1, &arg);
+        arg = (int *)malloc(sizeof(int));
+        *arg = i;
+        future = threadPoolExecute(pool, threadWorker1, arg);
         assert (future != NULL);
         sleep(1);
         assert(0 == threadPoolJoin(future, (void **)&retval));
-        assert(*retval == arg);
+        assert(*retval == i);
 	free(retval);
 	retval = NULL;
     }
@@ -326,6 +328,7 @@ void testBarrier1()
         }
     }
 
+    assert(0 == threadPoolDestroy(pool));
     printf("Test testBarrier1 passed.\n");
     return;
 }

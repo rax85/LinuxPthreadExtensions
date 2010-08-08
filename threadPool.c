@@ -137,6 +137,7 @@ int threadPoolDestroy(ThreadPool *pool)
     }
     free(pool->threads);
     free(pool->availability);
+    free(pool);
     return THREAD_POOL_SUCCESS;
 }
 
@@ -258,6 +259,7 @@ int threadPoolJoin(ThreadFuture *future, void **retval)
     /* Store the result and destroy the future object. */
     *retval = future->result;
     sem_destroy(&future->resultAvailable);
+    free(future);
 
     return THREAD_POOL_SUCCESS;
 }
@@ -330,37 +332,36 @@ int addNewWorker(ThreadPool *pool)
     if (runnable == NULL) { return THREAD_POOL_FAILURE; }
 
     /* Initialize the semaphore and set it to locked so that the thread can wait */
-    if (0 != sem_init(&runnable->workAvailable, 1)) { goto destroy_thread2; }
-    if (0 != sem_down(&runnable->workAvailable)) { goto destroy_thread1; }
+    if (0 != sem_init(&runnable->workAvailable, 1)) { goto destroy_thread1; }
+    if (0 != sem_down(&runnable->workAvailable)) { goto destroy_thread2; }
 
     /* Acquire the lock and grow the thread pool. */
-    if (0 != pthread_mutex_lock(&pool->avlblMutex)) { goto destroy_thread1; }
+    if (0 != pthread_mutex_lock(&pool->avlblMutex)) { goto destroy_thread2; }
 
     /* Is there room to grow? */
     if (pool->numAlive + 1 > pool->maxThreads) { 
-        pthread_mutex_unlock(&pool->avlblMutex);
-        goto destroy_thread1;
+        goto destroy_thread3;
     }
     
     currentIndex = pool->numAlive;
     pool->numAlive++;
+    runnable->index = currentIndex;
+    runnable->parent = pool;
 
     /* Finally, fire up a new worker. */
     if (0 != pthread_create(&runnable->tid, NULL, worker, runnable)) {
-        pthread_mutex_unlock(&pool->avlblMutex);
-	goto destroy_thread1;
+	goto destroy_thread3;
     }
 
-    runnable->index = currentIndex;
-    runnable->parent = pool;
     pool->threads[currentIndex] = runnable;
     pool->availability[currentIndex] = THREAD_AVAILABLE; 
 
     pthread_mutex_unlock(&pool->avlblMutex);
     return THREAD_POOL_SUCCESS;
 
-destroy_thread1: sem_destroy(&runnable->workAvailable);
-destroy_thread2: free(runnable);
+destroy_thread3: pthread_mutex_unlock(&pool->avlblMutex);
+destroy_thread2: sem_destroy(&runnable->workAvailable);
+destroy_thread1: free(runnable);
     return THREAD_POOL_FAILURE;
 }
 
