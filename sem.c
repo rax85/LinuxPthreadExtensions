@@ -3,7 +3,7 @@
  * @author Rakesh Iyer
  * @brief  A semaphore implementation that is built around pthread mutexes and
  *         condition variables. Supposedly better than a posix semaphore.
- * @bug    Untested.
+ * @bug    Not tested for performance or memory leaks.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by

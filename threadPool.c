@@ -2,7 +2,7 @@
  * @file   threadPool.c
  * @brief  A thread pool wrapper over regular pthreads.
  * @author Rakesh Iyer.
- * @bug    Untested.
+ * @bug    Not tested for performance or memory leaks.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by

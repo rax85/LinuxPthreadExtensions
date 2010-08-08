@@ -7,7 +7,7 @@
  *         the global heap of the program. Also, releasing the entire pool at thread
  *         exit allows for any leaked memory to be reclaimed.
  * @author Rakesh Iyer.
- * @bug    Untested.
+ * @bug    Not tested for performance or memory leaks.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
