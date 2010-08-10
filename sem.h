@@ -55,24 +55,22 @@
 /**
  * @brief A struct that represents a semaphore.
  */
-typedef struct __Semaphore {
+typedef struct __semaphore_t {
     unsigned int initialized;   /**< Stores whether the semaphore is initalized. */
     int value;                  /**< The current value of the semaphore. */
     pthread_mutex_t sem_mutex;  /**< The mutex that protects the value. */
     pthread_cond_t  sem_cvar;   /**< The cvar that threads wait on for the mutex. */
-}Semaphore;
+}lpx_semaphore_t;
 
-int sem_init(Semaphore *, int);
-int sem_destroy(Semaphore *sem);
-int sem_up(Semaphore *);
-int sem_down(Semaphore *);
-int sem_op(Semaphore *, int);
-int sem_timed_op(Semaphore *, int, long);
-int sem_up_multiple(Semaphore *, int);
-int sem_down_multiple(Semaphore *, int);
-int sem_timed_down(Semaphore *, int, long);
-int sem_timed_up(Semaphore *, int, long);
-struct timespec timeoutToTimespec(long);
-long timespecDiffMillis(struct timespec, struct timespec);
+int lpx_sem_init(lpx_semaphore_t *sem, int maxValue);
+int lpx_sem_destroy(lpx_semaphore_t *sem);
+int lpx_sem_up(lpx_semaphore_t *sem);
+int lpx_sem_down(lpx_semaphore_t *sem);
+int lpx_sem_op(lpx_semaphore_t *sem, int value);
+int lpx_sem_timed_op(lpx_semaphore_t *sem, int value, long timeoutMillis);
+int lpx_sem_up_multiple(lpx_semaphore_t *sem, int);
+int lpx_sem_down_multiple(lpx_semaphore_t *sem, int);
+int lpx_sem_timed_down(lpx_semaphore_t *sem, int value, long timeoutMillis);
+int lpx_sem_timed_up(lpx_semaphore_t *sem, int value, long timeoutMillis);
 
 #endif

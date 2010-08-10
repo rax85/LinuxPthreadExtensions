@@ -96,14 +96,14 @@
 /**
  * @brief A struct to represent a memory pool of fixed sized objects.
  */
-typedef struct __MempoolFixed {
+typedef struct __mempool_fixed_t {
     pthread_mutex_t *poolMutex;		/**< A mutex to protect the pool if needed. */
     void *pool;				/**< The actual memory pool. */
     void *freeList;			/**< List of free nodes. */
     long poolSize;			/**< Size of the actual memory pool. */
     long storedObjectSize;		/**< Object size + overhead */
     int magic;				/**< Enables a simple integrity check. */
-}MempoolFixed;
+}lpx_mempool_fixed_t;
 
 
 /*
@@ -120,27 +120,29 @@ typedef struct __MempoolFixed {
 /**
  * @brief A struct to represent a memory pool of variable sized objects.
  */
-typedef struct __MempoolVariable {
+typedef struct __mempool_variable_t {
     pthread_mutex_t *poolMutex;		/**< A mutex to protect the pool if needed. */
     void *pool;				/**< The actual memory pool. */
     long poolSize;			/**< The size of the actual pool. */
     void *freeList;			/**< List of free blocks. */
     int magic;				/**< Enables a simple integrity check. */
-}MempoolVariable;
+}lpx_mempool_variable_t;
 
-int mempool_create_fixed_pool(MempoolFixed *, long, int, int);
-void *mempool_fixed_alloc(MempoolFixed *);
-int mempool_fixed_free(void *);
-int mempool_destroy_fixed_pool(MempoolFixed *);
+int lpx_mempool_create_fixed_pool(lpx_mempool_fixed_t *pool, long objectSize, 
+                                  int numObjects, int isProtected);
+void *lpx_mempool_fixed_alloc(lpx_mempool_fixed_t *pool);
+int lpx_mempool_fixed_free(void *addr);
+int lpx_mempool_destroy_fixed_pool(lpx_mempool_fixed_t *pool);
 
-int mempool_create_variable_pool(MempoolVariable *, long, int);
-void *mempool_variable_alloc(MempoolVariable *, long);
-int mempool_variable_free(void *);
-int mempool_destroy_variable_pool(MempoolVariable *);
+int lpx_mempool_create_variable_pool(lpx_mempool_variable_t *pool, long, int);
+void *lpx_mempool_variable_alloc(lpx_mempool_variable_t *pool, long size);
+int lpx_mempool_variable_free(void *addr);
+int lpx_mempool_destroy_variable_pool(lpx_mempool_variable_t *pool);
 
-static void *findFirstFit(MempoolVariable *, long);
-static void *splitBlock(MempoolVariable *, void *, long *);
-static void insertIntoFreeList(MempoolVariable *, void *);
+// Functions for internal consumption of the library.
+static void *findFirstFit(lpx_mempool_variable_t *, long);
+static void *splitBlock(lpx_mempool_variable_t *, void *, long *);
+static void insertIntoFreeList(lpx_mempool_variable_t *, void *);
 static void insertAfter(long *, long *);
 static void insertBefore(long *, long *);
 static void coalesceBlocks(long *, long *, long *);

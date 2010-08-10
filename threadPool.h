@@ -59,7 +59,7 @@
  * @brief A struct to hold everything that the caller needs to wait for the result.
  */
 typedef struct __ThreadFuture {
-    Semaphore resultAvailable;   /**< Says that the callback result is available. */
+    lpx_semaphore_t resultAvailable; /**< Says that the callback result is available. */
     void *result;                /**< Holds the return value of the callback. */
 }ThreadFuture;
 
@@ -82,7 +82,7 @@ struct __ThreadPool;
 typedef struct __Thread {
     pthread_t tid;                /**< The thread id of the thread. */
     int index;                    /**< The index of this thread in the pool. */
-    Semaphore workAvailable;      /**< Signals that work is available. */
+    lpx_semaphore_t workAvailable;      /**< Signals that work is available. */
     WorkItem *workItem;           /**< A work item for the worker to process. */
     struct __ThreadPool *parent;  /**< The parent thread pool of this worker. */
 }Thread;
@@ -97,19 +97,19 @@ typedef struct __ThreadPool {
     Thread **threads;            /**< An array of threads in the pool. */
     char *availability;          /**< Which threads are available. */
     pthread_mutex_t avlblMutex;  /**< Protects the available array. */
-    Semaphore threadCounter;     /**< Counts the number of available threads. */
+    lpx_semaphore_t threadCounter;     /**< Counts the number of available threads. */
 }ThreadPool;
 
 /**
  * @brief A structure to represent a barrier.
  */
-typedef struct __Barrier {
+typedef struct __lpx_barrier_t {
     int numWaiters;		  /**< Max threads that can wait on this barrier */
     int numArrived;		  /**< Number of threads that have arrived */
     int barrierFlag;		  /**< Toggles whenever all threads arrive. */
     pthread_mutex_t barrierMutex; /**< Mutex to protect the barrier count. */
     pthread_cond_t barrierCvar;	  /**< Cvar for threads to wait on. */
-}Barrier;
+}lpx_barrier_t;
 
 /**
  * @brief An enum to define the types of thread pools.
@@ -131,9 +131,9 @@ int getFirstAvailableWorker(ThreadPool *pool);
 int signalWorker(Thread *worker);
 int addNewWorker(ThreadPool *pool);
 
-int createBarrier(Barrier *, int);
-int barrierSync(Barrier *);
-int destroyBarrier(Barrier *);
+int lpx_create_barrier(lpx_barrier_t *, int);
+int lpx_barrier_sync(lpx_barrier_t *);
+int lpx_destroy_barrier(lpx_barrier_t *);
 
 void *worker(void *param);
 

@@ -18,35 +18,35 @@
  */
 void testSem1()
 {
-    Semaphore sem;
+    lpx_semaphore_t sem;
     printf("=======================================\n");
-    assert(sem_init(&sem, 1) == 0);
+    assert(lpx_sem_init(&sem, 1) == 0);
     assert(sem.value == 1);
-    sem_down(&sem);
+    lpx_sem_down(&sem);
     assert(sem.value == 0);
-    sem_up(&sem);
+    lpx_sem_up(&sem);
     assert(sem.value == 1);
-    assert(sem_destroy(&sem) == 0);
+    assert(lpx_sem_destroy(&sem) == 0);
     printf("Test testSem1 passed.\n");
     return;
 }
 
 /**
- * @brief Placeholder for a test for timed semaphore lock.
+ * @brief Test for timed semaphore lock.
  */
 void testSem2()
 {
     int retval = 0;
-    Semaphore sem;
+    lpx_semaphore_t sem;
     printf("=======================================\n");
-    assert(sem_init(&sem, 10) == 0);
+    assert(lpx_sem_init(&sem, 10) == 0);
     // This one must succeed.
-    retval = sem_timed_op(&sem, -10, 1000);
+    retval = lpx_sem_timed_op(&sem, -10, 1000);
     assert(retval == 0);
     // This one should time out.
-    retval = sem_timed_op(&sem, -2, 5000);
+    retval = lpx_sem_timed_op(&sem, -2, 5000);
     assert(retval != 0);
-    assert(sem_destroy(&sem) == 0);
+    assert(lpx_sem_destroy(&sem) == 0);
     printf("Test testSem2 passed.\n");
     return;
 }
@@ -56,14 +56,14 @@ void testSem2()
  */
 void testSem3()
 {
-    Semaphore sem;
+    lpx_semaphore_t sem;
     printf("=======================================\n");
-    assert(sem_init(&sem, 1) == 0);
-    sem_down(&sem);
-    sem_up(&sem);
-    sem_up(&sem);
-    sem_op(&sem, -2);
-    assert(sem_destroy(&sem) == 0);
+    assert(lpx_sem_init(&sem, 1) == 0);
+    lpx_sem_down(&sem);
+    lpx_sem_up(&sem);
+    lpx_sem_up(&sem);
+    lpx_sem_op(&sem, -2);
+    assert(lpx_sem_destroy(&sem) == 0);
     printf("Test testSem3 passed.\n");
     return;
 }
@@ -281,13 +281,13 @@ int barrierTest1Index;   /**< Current index to write to in barrierOutArray */
 void *barrierTest(void *arg)
 {
     int i = 0;
-    Barrier *barrier = (Barrier *)arg;
+    lpx_barrier_t *barrier = (lpx_barrier_t *)arg;
     for(i = 0; i < BARRIERTEST1_NUM_ITERATIONS; i++) {
         pthread_mutex_lock(&barrierTest1Mutex);
 	barrierOutArray[barrierTest1Index++] = i;
 	pthread_mutex_unlock(&barrierTest1Mutex);
 	
-	barrierSync(barrier);
+	lpx_barrier_sync(barrier);
     }
     return NULL;
 }
@@ -302,15 +302,16 @@ void testBarrier1()
     int index = 0;
     int *retval = NULL;
     ThreadFuture *future[BARRIERTEST1_NUM_THREADS];
-    Barrier barrier;
+    lpx_barrier_t barrier;
 
     barrierTest1Index = 0;
     pthread_mutex_init(&barrierTest1Mutex, NULL);
 
-    ThreadPool *pool = threadPoolInit(BARRIERTEST1_NUM_THREADS, BARRIERTEST1_NUM_THREADS, THREAD_POOL_FIXED);
+    ThreadPool *pool = threadPoolInit(BARRIERTEST1_NUM_THREADS, \
+                                      BARRIERTEST1_NUM_THREADS, THREAD_POOL_FIXED);
     assert(pool != NULL);
 
-    assert(0 == createBarrier(&barrier, BARRIERTEST1_NUM_THREADS));
+    assert(0 == lpx_create_barrier(&barrier, BARRIERTEST1_NUM_THREADS));
     printf("=======================================\n");
 
     for (i = 0; i < BARRIERTEST1_NUM_THREADS; i++) {
@@ -329,6 +330,7 @@ void testBarrier1()
     }
 
     assert(0 == threadPoolDestroy(pool));
+    assert(0 == lpx_destroy_barrier(&barrier));
     printf("Test testBarrier1 passed.\n");
     return;
 }
@@ -341,29 +343,29 @@ void testBarrier1()
  */
 void testFixedMemPool1()
 {
-    MempoolFixed pool;
+    lpx_mempool_fixed_t pool;
     char *object1;
     char *object2;
 
     printf("=======================================\n");
-    assert(0 == mempool_create_fixed_pool(&pool, 64, 2, MEMPOOL_UNPROTECTED));
-    object1 = mempool_fixed_alloc(&pool);
+    assert(0 == lpx_mempool_create_fixed_pool(&pool, 64, 2, MEMPOOL_UNPROTECTED));
+    object1 = lpx_mempool_fixed_alloc(&pool);
     assert(object1 != NULL);
     memset(object1, 0, 64);
     
-    object2 = mempool_fixed_alloc(&pool);
+    object2 = lpx_mempool_fixed_alloc(&pool);
     assert(object2 != NULL);
     memset(object2, 1, 64);
 
-    assert(NULL == mempool_fixed_alloc(&pool));
-    assert(0 == mempool_fixed_free(object1));
-    assert(0 == mempool_fixed_free(object2));
+    assert(NULL == lpx_mempool_fixed_alloc(&pool));
+    assert(0 == lpx_mempool_fixed_free(object1));
+    assert(0 == lpx_mempool_fixed_free(object2));
 
-    assert(NULL != mempool_fixed_alloc(&pool));
-    assert(NULL != mempool_fixed_alloc(&pool));
-    assert(NULL == mempool_fixed_alloc(&pool));
+    assert(NULL != lpx_mempool_fixed_alloc(&pool));
+    assert(NULL != lpx_mempool_fixed_alloc(&pool));
+    assert(NULL == lpx_mempool_fixed_alloc(&pool));
 
-    assert(0 == mempool_destroy_fixed_pool(&pool));
+    assert(0 == lpx_mempool_destroy_fixed_pool(&pool));
     printf("Test testFixedMemPool1 passed.\n");
     return;
 }
@@ -373,29 +375,29 @@ void testFixedMemPool1()
  */
 void testFixedMemPool2()
 {
-    MempoolFixed pool;
+    lpx_mempool_fixed_t pool;
     char *object1;
     char *object2;
 
     printf("=======================================\n");
-    assert(0 == mempool_create_fixed_pool(&pool, 64, 2, MEMPOOL_PROTECTED));
-    object1 = mempool_fixed_alloc(&pool);
+    assert(0 == lpx_mempool_create_fixed_pool(&pool, 64, 2, MEMPOOL_PROTECTED));
+    object1 = lpx_mempool_fixed_alloc(&pool);
     assert(object1 != NULL);
     memset(object1, 0, 64);
     
-    object2 = mempool_fixed_alloc(&pool);
+    object2 = lpx_mempool_fixed_alloc(&pool);
     assert(object2 != NULL);
     memset(object2, 1, 64);
 
-    assert(NULL == mempool_fixed_alloc(&pool));
-    assert(0 == mempool_fixed_free(object1));
-    assert(0 == mempool_fixed_free(object2));
+    assert(NULL == lpx_mempool_fixed_alloc(&pool));
+    assert(0 == lpx_mempool_fixed_free(object1));
+    assert(0 == lpx_mempool_fixed_free(object2));
 
-    assert(NULL != mempool_fixed_alloc(&pool));
-    assert(NULL != mempool_fixed_alloc(&pool));
-    assert(NULL == mempool_fixed_alloc(&pool));
+    assert(NULL != lpx_mempool_fixed_alloc(&pool));
+    assert(NULL != lpx_mempool_fixed_alloc(&pool));
+    assert(NULL == lpx_mempool_fixed_alloc(&pool));
 
-    assert(0 == mempool_destroy_fixed_pool(&pool));
+    assert(0 == lpx_mempool_destroy_fixed_pool(&pool));
     printf("Test testFixedMemPool2 passed.\n");
 }
 
@@ -408,31 +410,31 @@ void testFixedMemPool2()
  */
 void testVariableMemPool1()
 {
-    MempoolVariable pool;
+    lpx_mempool_variable_t pool;
     char *object1 = NULL;
     char *object2 = NULL;
     long sixM = 6L * 1024L * 1024L;
 
     printf("=======================================\n");
-    assert(0 == mempool_create_variable_pool(&pool, sixM, MEMPOOL_UNPROTECTED));
+    assert(0 == lpx_mempool_create_variable_pool(&pool, sixM, MEMPOOL_UNPROTECTED));
 
-    object1 = mempool_variable_alloc(&pool, 64);
+    object1 = lpx_mempool_variable_alloc(&pool, 64);
     assert(NULL != object1);
     memset(object1, 1, 64);
 
-    object2 = mempool_variable_alloc(&pool, 128);
+    object2 = lpx_mempool_variable_alloc(&pool, 128);
     assert(NULL != object2);
     memset(object2, 2, 128);
 
-    assert(0 == mempool_variable_free(object1));
-    assert(0 == mempool_variable_free(object2));
+    assert(0 == lpx_mempool_variable_free(object1));
+    assert(0 == lpx_mempool_variable_free(object2));
 
-    object1 = mempool_variable_alloc(&pool, sixM);
+    object1 = lpx_mempool_variable_alloc(&pool, sixM);
     assert(NULL != object1);
     memset(object1, 3, sixM);
-    assert(0 == mempool_variable_free(object1));
+    assert(0 == lpx_mempool_variable_free(object1));
 
-    assert(0 == mempool_destroy_variable_pool(&pool));
+    assert(0 == lpx_mempool_destroy_variable_pool(&pool));
     printf("Test testVariableMemPool1 passed.\n");
 }
 
@@ -441,31 +443,31 @@ void testVariableMemPool1()
  */
 void testVariableMemPool2()
 {
-    MempoolVariable pool;
+    lpx_mempool_variable_t pool;
     char *object1 = NULL;
     char *object2 = NULL;
     long sixM = 6L * 1024L * 1024L;
 
     printf("=======================================\n");
-    assert(0 == mempool_create_variable_pool(&pool, sixM, MEMPOOL_PROTECTED));
+    assert(0 == lpx_mempool_create_variable_pool(&pool, sixM, MEMPOOL_PROTECTED));
 
-    object1 = mempool_variable_alloc(&pool, 64);
+    object1 = lpx_mempool_variable_alloc(&pool, 64);
     assert(NULL != object1);
     memset(object1, 1, 64);
 
-    object2 = mempool_variable_alloc(&pool, 128);
+    object2 = lpx_mempool_variable_alloc(&pool, 128);
     assert(NULL != object2);
     memset(object2, 2, 128);
 
-    assert(0 == mempool_variable_free(object1));
-    assert(0 == mempool_variable_free(object2));
+    assert(0 == lpx_mempool_variable_free(object1));
+    assert(0 == lpx_mempool_variable_free(object2));
 
-    object1 = mempool_variable_alloc(&pool, sixM);
+    object1 = lpx_mempool_variable_alloc(&pool, sixM);
     assert(NULL != object1);
     memset(object1, 3, sixM);
-    assert(0 == mempool_variable_free(object1));
+    assert(0 == lpx_mempool_variable_free(object1));
 
-    assert(0 == mempool_destroy_variable_pool(&pool));
+    assert(0 == lpx_mempool_destroy_variable_pool(&pool));
     printf("Test testVariableMemPool2 passed.\n");
 }
 

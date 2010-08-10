@@ -58,7 +58,7 @@ ThreadPool *threadPoolInit(int minThreads, int maxThreads, PoolType type)
         goto pool_destroy1;
     }
 
-    if (SEMAPHORE_SUCCESS != sem_init(&pool->threadCounter, maxThreads)) {
+    if (SEMAPHORE_SUCCESS != lpx_sem_init(&pool->threadCounter, maxThreads)) {
         goto pool_destroy2; 
     }
     
@@ -90,7 +90,7 @@ ThreadPool *threadPoolInit(int minThreads, int maxThreads, PoolType type)
 pool_destroy5: free(pool->availability);
 pool_destroy4: free(pool->threads);
 pool_destroy3: pthread_mutex_destroy(&pool->avlblMutex);
-pool_destroy2: sem_destroy(&pool->threadCounter);
+pool_destroy2: lpx_sem_destroy(&pool->threadCounter);
 pool_destroy1: free(pool);
    return NULL;
 }
@@ -114,7 +114,7 @@ int threadPoolDestroy(ThreadPool *pool)
 
     // Wait for all threads to terminate all user actions.
     for (i = 0; i < pool->maxThreads; i++) {
-        sem_down(&pool->threadCounter);
+        lpx_sem_down(&pool->threadCounter);
     }
 
     // Now tell all the threads to die.
@@ -130,7 +130,7 @@ int threadPoolDestroy(ThreadPool *pool)
     
     /* All threads recovered, free up the data structure. */
     pthread_mutex_destroy(&pool->avlblMutex);
-    sem_destroy(&pool->threadCounter);
+    lpx_sem_destroy(&pool->threadCounter);
 
     for (i = 0; i < pool->numAlive; i++) {
         free(pool->threads[i]);
@@ -175,13 +175,13 @@ ThreadFuture *threadPoolExecute(ThreadPool *pool, void *(*callback)(void *), voi
         return NULL;
     }
     
-    if (0 != sem_init(&future->resultAvailable, 1)) {
+    if (0 != lpx_sem_init(&future->resultAvailable, 1)) {
         free(future);
 	return NULL;
     }
 
-    if (0 != sem_down(&future->resultAvailable)) {
-        sem_destroy(&future->resultAvailable);
+    if (0 != lpx_sem_down(&future->resultAvailable)) {
+        lpx_sem_destroy(&future->resultAvailable);
         free(future);
         return NULL;
     }
@@ -197,7 +197,7 @@ ThreadFuture *threadPoolExecute(ThreadPool *pool, void *(*callback)(void *), voi
     workItem->future = future;
 
     /* Wait for a thread to be available to dispatch the work item. */
-    if (SEMAPHORE_SUCCESS != sem_down(&pool->threadCounter)) {
+    if (SEMAPHORE_SUCCESS != lpx_sem_down(&pool->threadCounter)) {
         free(workItem);
 	free(future);
         return NULL;
@@ -252,13 +252,13 @@ int threadPoolJoin(ThreadFuture *future, void **retval)
     }
 
     /* Wait for the result to be available.*/
-    if (0 != sem_down(&future->resultAvailable)) {
+    if (0 != lpx_sem_down(&future->resultAvailable)) {
         return THREAD_POOL_FAILURE;
     }
 
     /* Store the result and destroy the future object. */
     *retval = future->result;
-    sem_destroy(&future->resultAvailable);
+    lpx_sem_destroy(&future->resultAvailable);
     free(future);
 
     return THREAD_POOL_SUCCESS;
@@ -305,7 +305,7 @@ int getFirstAvailableWorker(ThreadPool *pool)
  */
 int signalWorker(Thread *worker)
 {
-    if (0 != sem_up(&worker->workAvailable)) {
+    if (0 != lpx_sem_up(&worker->workAvailable)) {
         return THREAD_POOL_FAILURE;
     }
 
@@ -332,8 +332,8 @@ int addNewWorker(ThreadPool *pool)
     if (runnable == NULL) { return THREAD_POOL_FAILURE; }
 
     /* Initialize the semaphore and set it to locked so that the thread can wait */
-    if (0 != sem_init(&runnable->workAvailable, 1)) { goto destroy_thread1; }
-    if (0 != sem_down(&runnable->workAvailable)) { goto destroy_thread2; }
+    if (0 != lpx_sem_init(&runnable->workAvailable, 1)) { goto destroy_thread1; }
+    if (0 != lpx_sem_down(&runnable->workAvailable)) { goto destroy_thread2; }
 
     /* Acquire the lock and grow the thread pool. */
     if (0 != pthread_mutex_lock(&pool->avlblMutex)) { goto destroy_thread2; }
@@ -360,7 +360,7 @@ int addNewWorker(ThreadPool *pool)
     return THREAD_POOL_SUCCESS;
 
 destroy_thread3: pthread_mutex_unlock(&pool->avlblMutex);
-destroy_thread2: sem_destroy(&runnable->workAvailable);
+destroy_thread2: lpx_sem_destroy(&runnable->workAvailable);
 destroy_thread1: free(runnable);
     return THREAD_POOL_FAILURE;
 }
@@ -382,7 +382,7 @@ void *worker(void *param)
 
     while (1) {
         // Wait for some work to be available.
-        if (0 != sem_down(&runnable->workAvailable)) {
+        if (0 != lpx_sem_down(&runnable->workAvailable)) {
 	    return NULL;
 	}
 
@@ -399,7 +399,7 @@ void *worker(void *param)
 	// Done running the user function, lets set up the returns for the caller.
 	future = workItem->future;
         future->result = retval;
-	sem_up(&future->resultAvailable);
+	lpx_sem_up(&future->resultAvailable);
 	free(workItem);
 
 	// Finally, mark this thread as available.
@@ -414,7 +414,7 @@ void *worker(void *param)
 	    return NULL;
 	}
 
-        if (0 != sem_up(&parent->threadCounter)) {
+        if (0 != lpx_sem_up(&parent->threadCounter)) {
             return NULL;
         }
     }
@@ -428,7 +428,7 @@ void *worker(void *param)
  * @param  numWaiters The number of threads participating in the barrier.
  * @return 0 on success, -1 on failure.
  */
-int createBarrier(Barrier *barrier, int numWaiters)
+int lpx_create_barrier(lpx_barrier_t *barrier, int numWaiters)
 {
     if (barrier == NULL || numWaiters == 0) {
         return THREAD_POOL_FAILURE;
@@ -459,7 +459,7 @@ int createBarrier(Barrier *barrier, int numWaiters)
  * @param  barrier The barrier to synchronize on.
  * @return 0 on success, -1 on failure.
  */
-int barrierSync(Barrier *barrier)
+int lpx_barrier_sync(lpx_barrier_t *barrier)
 {
     int barrierFlag = 0;
 
@@ -511,7 +511,7 @@ int barrierSync(Barrier *barrier)
  * @param  barrier The barrier to destroy.
  * @return 0 on success, -1 on failure.
  */
-int destroyBarrier(Barrier *barrier)
+int lpx_destroy_barrier(lpx_barrier_t *barrier)
 {
     if (barrier == NULL) {
         return THREAD_POOL_FAILURE;

@@ -21,13 +21,17 @@
 
 #include "sem.h"
 
+/* Forward declarations of utility functions. */
+static struct timespec timeoutToTimespec(long);
+static long timespecDiffMillis(struct timespec, struct timespec);
+
 /**
  * @brief  Initialize a semaphore. Starts off as fully available.
  * @param  sem      The semaphore to initialize.
  * @param  maxValue The maximum value of the semaphore.
  * @return 0 on success, -1 on failure.
  */
-int sem_init(Semaphore *sem, int maxValue)
+int lpx_sem_init(lpx_semaphore_t *sem, int maxValue)
 {
     /* Validate all the parameters. */
     if (sem == NULL) {
@@ -60,7 +64,7 @@ int sem_init(Semaphore *sem, int maxValue)
  * @param  sem The semaphore to destroy.
  * @return 0 on success, -1 on failure.
  */
-int sem_destroy(Semaphore *sem)
+int lpx_sem_destroy(lpx_semaphore_t *sem)
 {
     /* Validate all the parameters. */
     if (sem == NULL) {
@@ -79,9 +83,9 @@ int sem_destroy(Semaphore *sem)
  * @param  sem   The semaphore to increment.
  * @return 0 on success, -1 on failure.
  */
-int sem_up(Semaphore *sem)
+int lpx_sem_up(lpx_semaphore_t *sem)
 {
-    return sem_up_multiple(sem, 1);
+    return lpx_sem_up_multiple(sem, 1);
 }
 
 
@@ -92,9 +96,9 @@ int sem_up(Semaphore *sem)
  * @param  sem   The semaphore to decrement.
  * @return 0 on success, -1 on failure.
  */
-int sem_down(Semaphore *sem)
+int lpx_sem_down(lpx_semaphore_t *sem)
 {
-    return sem_down_multiple(sem, 1); 
+    return lpx_sem_down_multiple(sem, 1); 
 }
 
 /**
@@ -104,16 +108,16 @@ int sem_down(Semaphore *sem)
  *               for sem decrements.
  * @return 0 on success -1 otherwise.
  */
-int sem_op(Semaphore *sem, int value)
+int lpx_sem_op(lpx_semaphore_t *sem, int value)
 {
     if (value == 0) {
         return SEMAPHORE_FAILURE;
     }
 
     if (value > 0) {
-        return sem_up_multiple(sem, value);
+        return lpx_sem_up_multiple(sem, value);
     } else {
-        return sem_down_multiple(sem, -1 * value);
+        return lpx_sem_down_multiple(sem, -1 * value);
     }
 }
 
@@ -123,7 +127,7 @@ int sem_op(Semaphore *sem, int value)
  * @param  value The value to subtract from the semaphore.
  * @return 0 on success, -1 on failure.
  */
-int sem_down_multiple(Semaphore *sem, int value)
+int lpx_sem_down_multiple(lpx_semaphore_t *sem, int value)
 {
     int retval = 0;
 
@@ -162,7 +166,7 @@ int sem_down_multiple(Semaphore *sem, int value)
  * @param  value The value to add to the semaphore.
  * @return 0 on success, -1 on failure.
  */
-int sem_up_multiple(Semaphore *sem, int value)
+int lpx_sem_up_multiple(lpx_semaphore_t *sem, int value)
 {
     if (sem == NULL || sem->initialized != SEMAPHORE_INITIALIZED) {
         return SEMAPHORE_FAILURE;
@@ -197,16 +201,16 @@ int sem_up_multiple(Semaphore *sem, int value)
  * @param  timeoutMillis Timeout in milliseconds.
  * @return 0 on success, -1 on failure, -2 on timeout.
  */
-int sem_timed_op(Semaphore *sem, int value, long timeoutMillis)
+int lpx_sem_timed_op(lpx_semaphore_t *sem, int value, long timeoutMillis)
 {
     if (value == 0) {
         return SEMAPHORE_FAILURE;
     }
 
     if (value > 0) {
-        return sem_timed_up(sem, value, timeoutMillis);
+        return lpx_sem_timed_up(sem, value, timeoutMillis);
     } else {
-        return sem_timed_down(sem, -1 * value, timeoutMillis);
+        return lpx_sem_timed_down(sem, -1 * value, timeoutMillis);
     }
 }
 
@@ -217,7 +221,7 @@ int sem_timed_op(Semaphore *sem, int value, long timeoutMillis)
  * @param  timeoutMillis Timeout in milliseconds.
  * @return 0 on success, -1 on failure, -2 on failure.
  */
-int sem_timed_down(Semaphore *sem, int value, long timeoutMillis)
+int lpx_sem_timed_down(lpx_semaphore_t *sem, int value, long timeoutMillis)
 {
     struct timespec timeout;
     struct timespec before;
@@ -266,7 +270,6 @@ int sem_timed_down(Semaphore *sem, int value, long timeoutMillis)
             if (errno == ETIMEDOUT) {
                 return SEMAPHORE_TIMEOUT;
             } else {
-                perror(NULL);
                 return SEMAPHORE_FAILURE;
             }
         }
@@ -298,7 +301,7 @@ int sem_timed_down(Semaphore *sem, int value, long timeoutMillis)
  * @param  timeoutMillis Timeout in milliseconds for the operation.
  * @return 0 on success, -1 on failure, -2 on failure.
  */
-int sem_timed_up(Semaphore *sem, int value, long timeoutMillis)
+int lpx_sem_timed_up(lpx_semaphore_t *sem, int value, long timeoutMillis)
 {
     struct timespec timeout;
 
@@ -344,7 +347,7 @@ int sem_timed_up(Semaphore *sem, int value, long timeoutMillis)
  * @param  timeoutMillis Time in milliseconds.
  * @return The same value represented in a struct timespec as absolute time.
  */
-struct timespec timeoutToTimespec(long timeoutMillis)
+static struct timespec timeoutToTimespec(long timeoutMillis)
 {
     struct timespec time;
     long timeoutSec = 0;
@@ -372,7 +375,7 @@ struct timespec timeoutToTimespec(long timeoutMillis)
  * @param  lesser  The timespec that represents the lesser value.
  * @return The difference in milliseconds.
  */
-long timespecDiffMillis(struct timespec greater, struct timespec lesser)
+static long timespecDiffMillis(struct timespec greater, struct timespec lesser)
 {
     long diff = 0;
     long nsecDiff = greater.tv_nsec - lesser.tv_nsec;

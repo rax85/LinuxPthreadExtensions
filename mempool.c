@@ -26,15 +26,15 @@
  * @param  pool The pool to create.
  * @param  objectSize Size of an individual object in the pool.
  * @param  numObjects The maximum number of objects in the pool.
- * @param  protected Whether to protect the pool with a mutex or not. Only allocations
- *                   on protected pools are thread safe. Use an unprotected pool only
- *                   when you know that you will not be sharing a pool between threads.
+ * @param  isProtected Whether to protect the pool with a mutex or not. Only allocations
+ *                     on protected pools are thread safe. Use an unprotected pool only
+ *                     when you know that you will not be sharing a pool between threads.
  * @return 0 on success, -1 on failure.
  */
-int mempool_create_fixed_pool(MempoolFixed *pool, 
-                              long objectSize, 
-                              int numObjects, 
-                              int protected)
+int lpx_mempool_create_fixed_pool(lpx_mempool_fixed_t *pool, 
+                                  long objectSize, 
+                                  int numObjects, 
+                                  int isProtected)
 {
     long *currentBlockHeader = NULL;
     long storedObjectSize = 0;
@@ -45,7 +45,7 @@ int mempool_create_fixed_pool(MempoolFixed *pool,
     }
 
     // A null in place of the mutex means that the caller didn't need thread safety.
-    if (protected == MEMPOOL_PROTECTED) {
+    if (isProtected == MEMPOOL_PROTECTED) {
         pool->poolMutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
         if (pool->poolMutex == NULL) {
             return MEMPOOL_FAILURE;
@@ -95,7 +95,7 @@ cfpool_destroy1: free(pool->poolMutex);
  * @param  pool The pool to allocate from.
  * @return A valid address on success, NULL on failure.
  */
-void *mempool_fixed_alloc(MempoolFixed *pool)
+void *lpx_mempool_fixed_alloc(lpx_mempool_fixed_t *pool)
 {
     void *addr = NULL;
     long *object = NULL;
@@ -142,10 +142,10 @@ void *mempool_fixed_alloc(MempoolFixed *pool)
  * @param  addr The address of the object that needs to be freed.
  * @return 0 on success, -1 on failure.
  */
-int mempool_fixed_free(void *addr)
+int lpx_mempool_fixed_free(void *addr)
 {
     long *object = (long *)((long)addr - MEMPOOL_PER_OBJECT_OVERHEAD);
-    MempoolFixed *pool = NULL;
+    lpx_mempool_fixed_t *pool = NULL;
 
     if (addr == NULL) {
         return MEMPOOL_FAILURE;
@@ -153,7 +153,7 @@ int mempool_fixed_free(void *addr)
 
     // The first sizeof(long) bytes from the actual start are a back
     // pointer to the pool that this address belongs to.
-    pool = (MempoolFixed *)*object;
+    pool = (lpx_mempool_fixed_t *)*object;
     if (pool->magic != MEMPOOL_FIXED_MAGIC) {
         return MEMPOOL_FAILURE;
     }
@@ -184,7 +184,7 @@ int mempool_fixed_free(void *addr)
  * @param  pool The pool to destroy.
  * @return 0 on success, -1 on failure.
  */
-int mempool_destroy_fixed_pool(MempoolFixed *pool)
+int lpx_mempool_destroy_fixed_pool(lpx_mempool_fixed_t *pool)
 {
     if (pool == NULL) {
         return MEMPOOL_FAILURE;
@@ -206,10 +206,11 @@ int mempool_destroy_fixed_pool(MempoolFixed *pool)
  * @brief  Create a memory pool that can allocate variable sized objects.
  * @param  pool The pool to allocate from.
  * @param  size The total size of the memory pool.
- * @param  protected Should the pool be protected by a mutex?
+ * @param  isProtected Should the pool be protected by a mutex?
  * @return 0 on success, -1 on failure.
  */
-int mempool_create_variable_pool(MempoolVariable *pool, long size, int protected)
+int lpx_mempool_create_variable_pool(lpx_mempool_variable_t *pool, 
+                                     long size, int isProtected)
 {
     long *blockMetadata = NULL;
 
@@ -217,7 +218,7 @@ int mempool_create_variable_pool(MempoolVariable *pool, long size, int protected
         return MEMPOOL_FAILURE;
     }
 
-    if (protected == MEMPOOL_PROTECTED) {
+    if (isProtected == MEMPOOL_PROTECTED) {
         pool->poolMutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
 	if (pool->poolMutex == NULL) {
 	    return MEMPOOL_FAILURE;
@@ -262,7 +263,7 @@ int mempool_create_variable_pool(MempoolVariable *pool, long size, int protected
  * @param  size The size of the object to allocate.
  * @return A valid address on success, NULL on failure.
  */
-void *mempool_variable_alloc(MempoolVariable *pool, long size)
+void *lpx_mempool_variable_alloc(lpx_mempool_variable_t *pool, long size)
 {
     void *candidateBlock = NULL;
     int unlockNeeded = 0;
@@ -324,9 +325,9 @@ void *mempool_variable_alloc(MempoolVariable *pool, long size)
  * @param  addr The address of the object to free.
  * @return 0 on success, -1 on failure.
  */
-int mempool_variable_free(void *addr)
+int lpx_mempool_variable_free(void *addr)
 {
-    MempoolVariable *pool = NULL;
+    lpx_mempool_variable_t *pool = NULL;
     long size = 0;
     long *originalBlock = (long *)addr;
 
@@ -336,7 +337,7 @@ int mempool_variable_free(void *addr)
 
     // Find the pool that this block points to & the size of the block.
     originalBlock -= 2;
-    pool = (MempoolVariable *)originalBlock[0];
+    pool = (lpx_mempool_variable_t *)originalBlock[0];
     size = originalBlock[1];
     if (pool->magic != MEMPOOL_VARIABLE_MAGIC) {
         return MEMPOOL_FAILURE;
@@ -368,7 +369,7 @@ int mempool_variable_free(void *addr)
  * @param  pool The pool to destroy.
  * @return 0 on success, -1 on failure.
  */
-int mempool_destroy_variable_pool(MempoolVariable *pool)
+int lpx_mempool_destroy_variable_pool(lpx_mempool_variable_t *pool)
 {
     if (pool == NULL || pool->magic != MEMPOOL_VARIABLE_MAGIC || pool->pool == NULL) {
         return MEMPOOL_FAILURE;
@@ -390,7 +391,7 @@ int mempool_destroy_variable_pool(MempoolVariable *pool)
  * @param size The size of block to search for.
  * @return The address of the first block that fits, NULL if no fit present.
  */
-static void *findFirstFit(MempoolVariable *pool, long size)
+static void *findFirstFit(lpx_mempool_variable_t *pool, long size)
 {
     void *firstFit = NULL;
     long *blockMetadata = NULL;
@@ -418,7 +419,7 @@ static void *findFirstFit(MempoolVariable *pool, long size)
  * @param requestSize The desired size of block to retrieve.
  * @return The address of the allocated block to return to the caller.
  */
-static void *splitBlock(MempoolVariable *pool, void *addr, long *requestSize)
+static void *splitBlock(lpx_mempool_variable_t *pool, void *addr, long *requestSize)
 {
     void *allocatedBlock = NULL;
     long *blockMetadata= (long *)addr;
@@ -479,7 +480,7 @@ static void *splitBlock(MempoolVariable *pool, void *addr, long *requestSize)
  * @param pool The pool to add the block to.
  * @param addr The address to add into the free list.
  */
-static void insertIntoFreeList(MempoolVariable *pool, void *addr)
+static void insertIntoFreeList(lpx_mempool_variable_t *pool, void *addr)
 {
     long *listHead = (long *)pool->freeList;
     long *node = (long *)pool->freeList;
