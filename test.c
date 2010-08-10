@@ -95,24 +95,24 @@ void testThreadPool1()
     int i = 0;
     int *arg = NULL;
     int *retval = NULL;
-    ThreadFuture *future = NULL;
-    ThreadPool *pool = threadPoolInit(1, 1, THREAD_POOL_FIXED);
+    lpx_thread_future_t *future = NULL;
+    lpx_threadpool_t *pool = lpx_threadpool_init(1, 1, THREAD_POOL_FIXED);
     assert(pool != NULL);
     printf("=======================================\n");
 
     for (i = 1; i <= 42; i++) {
         arg = (int *)malloc(sizeof(int));
         *arg = i;
-        future = threadPoolExecute(pool, threadWorker1, arg);
+        future = lpx_threadpool_execute(pool, threadWorker1, arg);
         assert (future != NULL);
         sleep(1);
-        assert(0 == threadPoolJoin(future, (void **)&retval));
+        assert(0 == lpx_threadpool_join(future, (void **)&retval));
         assert(*retval == i);
 	free(retval);
 	retval = NULL;
     }
     assert(sanityCounter == 42);
-    assert(0 == threadPoolDestroy(pool));
+    assert(0 == lpx_threadpool_destroy(pool));
     printf("Test testThreadPool1 passed.\n");
     return;
 }
@@ -125,8 +125,8 @@ void testThreadPool2()
     int i = 0;
     int *arg = NULL;
     int *retval = NULL;
-    ThreadFuture *future[42];
-    ThreadPool *pool = threadPoolInit(1, 1, THREAD_POOL_FIXED);
+    lpx_thread_future_t *future[42];
+    lpx_threadpool_t *pool = lpx_threadpool_init(1, 1, THREAD_POOL_FIXED);
     assert(pool != NULL);
     sanityCounter = 0;
     printf("=======================================\n");
@@ -134,19 +134,19 @@ void testThreadPool2()
     for (i = 1; i <= 42; i++) {
         arg = (int *)malloc(sizeof(int));
         *arg = i;
-        future[i - 1] = threadPoolExecute(pool, threadWorker1, arg);
+        future[i - 1] = lpx_threadpool_execute(pool, threadWorker1, arg);
         assert (future != NULL);
     }
 
     for (i = 1; i <= 42; i++) {
-        assert(0 == threadPoolJoin(future[i - 1], (void **)&retval));
+        assert(0 == lpx_threadpool_join(future[i - 1], (void **)&retval));
         assert(*retval == i);
 	free(retval);
 	retval = NULL;
     }
 
     assert(sanityCounter == 42);
-    assert(0 == threadPoolDestroy(pool));
+    assert(0 == lpx_threadpool_destroy(pool));
     printf("Test testThreadPool2 passed.\n");
     return;
 }
@@ -159,8 +159,8 @@ void testThreadPool3()
     int i = 0;
     int *arg = NULL;
     int *retval = NULL;
-    ThreadFuture *future[42];
-    ThreadPool *pool = threadPoolInit(42, 42, THREAD_POOL_FIXED);
+    lpx_thread_future_t *future[42];
+    lpx_threadpool_t *pool = lpx_threadpool_init(42, 42, THREAD_POOL_FIXED);
     assert(pool != NULL);
     sanityCounter = 0;
     printf("=======================================\n");
@@ -168,19 +168,19 @@ void testThreadPool3()
     for (i = 1; i <= 42; i++) {
         arg = (int *)malloc(sizeof(int));
         *arg = i;
-        future[i - 1] = threadPoolExecute(pool, threadWorker1, arg);
+        future[i - 1] = lpx_threadpool_execute(pool, threadWorker1, arg);
         assert (future[i - 1] != NULL);
     }
 
     for (i = 1; i <= 42; i++) {
-        assert(0 == threadPoolJoin(future[i - 1], (void **)&retval));
+        assert(0 == lpx_threadpool_join(future[i - 1], (void **)&retval));
         assert(*retval == i);
 	free(retval);
 	retval = NULL;
     }
 
     assert(sanityCounter == 42);
-    assert(0 == threadPoolDestroy(pool));
+    assert(0 == lpx_threadpool_destroy(pool));
     printf("Test testThreadPool3 passed.\n");
     return;
 }
@@ -193,8 +193,8 @@ void testThreadPool4()
     int i = 0;
     int *arg = NULL;
     int *retval = NULL;
-    ThreadFuture *future[42];
-    ThreadPool *pool = threadPoolInit(42, 42, THREAD_POOL_FIXED);
+    lpx_thread_future_t *future[42];
+    lpx_threadpool_t *pool = lpx_threadpool_init(42, 42, THREAD_POOL_FIXED);
     assert(pool != NULL);
     sanityCounter = 0;
     printf("=======================================\n");
@@ -202,7 +202,7 @@ void testThreadPool4()
     for (i = 1; i <= 42; i++) {
         arg = (int *)malloc(sizeof(int));
         *arg = i;
-        future[i - 1] = threadPoolExecute(pool, threadWorker1, arg);
+        future[i - 1] = lpx_threadpool_execute(pool, threadWorker1, arg);
         assert (future[i - 1] != NULL);
     }
 
@@ -210,14 +210,14 @@ void testThreadPool4()
     sleep(10);
 
     for (i = 1; i <= 42; i++) {
-        assert(0 == threadPoolJoin(future[i - 1], (void **)&retval));
+        assert(0 == lpx_threadpool_join(future[i - 1], (void **)&retval));
         assert(*retval == i);
 	free(retval);
 	retval = NULL;
     }
 
     assert(sanityCounter == 42);
-    assert(0 == threadPoolDestroy(pool));
+    assert(0 == lpx_threadpool_destroy(pool));
     printf("Test testThreadPool4 passed.\n");
     return;
 }
@@ -230,8 +230,8 @@ void testThreadPool5()
     int i = 0;
     int *arg = NULL;
     int *retval = NULL;
-    ThreadFuture *future[42];
-    ThreadPool *pool = threadPoolInit(12, 42, THREAD_POOL_VARIABLE);
+    lpx_thread_future_t *future[42];
+    lpx_threadpool_t *pool = lpx_threadpool_init(12, 42, THREAD_POOL_VARIABLE);
     assert(pool != NULL);
     sanityCounter = 0;
     printf("=======================================\n");
@@ -239,19 +239,19 @@ void testThreadPool5()
     for (i = 1; i <= 42; i++) {
         arg = (int *)malloc(sizeof(int));
         *arg = i;
-        future[i - 1] = threadPoolExecute(pool, threadWorker1, arg);
+        future[i - 1] = lpx_threadpool_execute(pool, threadWorker1, arg);
         assert (future[i - 1] != NULL);
     }
 
     for (i = 1; i <= 42; i++) {
-        assert(0 == threadPoolJoin(future[i - 1], (void **)&retval));
+        assert(0 == lpx_threadpool_join(future[i - 1], (void **)&retval));
         assert(*retval == i);
 	free(retval);
 	retval = NULL;
     }
 
     assert(sanityCounter == 42);
-    assert(0 == threadPoolDestroy(pool));
+    assert(0 == lpx_threadpool_destroy(pool));
     printf("Test testThreadPool5 passed.\n");
     return;
 }
@@ -301,26 +301,26 @@ void testBarrier1()
     int n = 0;
     int index = 0;
     int *retval = NULL;
-    ThreadFuture *future[BARRIERTEST1_NUM_THREADS];
+    lpx_thread_future_t *future[BARRIERTEST1_NUM_THREADS];
     lpx_barrier_t barrier;
 
     barrierTest1Index = 0;
     pthread_mutex_init(&barrierTest1Mutex, NULL);
 
-    ThreadPool *pool = threadPoolInit(BARRIERTEST1_NUM_THREADS, \
-                                      BARRIERTEST1_NUM_THREADS, THREAD_POOL_FIXED);
+    lpx_threadpool_t *pool = lpx_threadpool_init(BARRIERTEST1_NUM_THREADS, \
+                                           BARRIERTEST1_NUM_THREADS, THREAD_POOL_FIXED);
     assert(pool != NULL);
 
     assert(0 == lpx_create_barrier(&barrier, BARRIERTEST1_NUM_THREADS));
     printf("=======================================\n");
 
     for (i = 0; i < BARRIERTEST1_NUM_THREADS; i++) {
-        future[i] = threadPoolExecute(pool, barrierTest, (void *)&barrier);
+        future[i] = lpx_threadpool_execute(pool, barrierTest, (void *)&barrier);
         assert (future[i] != NULL);
     }
 
     for (i = 0; i < BARRIERTEST1_NUM_THREADS; i++) {
-        assert(0 == threadPoolJoin(future[i], (void **)&retval));
+        assert(0 == lpx_threadpool_join(future[i], (void **)&retval));
     }
 
     for (n = 0; n < BARRIERTEST1_NUM_ITERATIONS; n++) {
@@ -329,7 +329,7 @@ void testBarrier1()
         }
     }
 
-    assert(0 == threadPoolDestroy(pool));
+    assert(0 == lpx_threadpool_destroy(pool));
     assert(0 == lpx_destroy_barrier(&barrier));
     printf("Test testBarrier1 passed.\n");
     return;

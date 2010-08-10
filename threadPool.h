@@ -58,10 +58,10 @@
 /**
  * @brief A struct to hold everything that the caller needs to wait for the result.
  */
-typedef struct __ThreadFuture {
+typedef struct __lpx_thread_future_t {
     lpx_semaphore_t resultAvailable; /**< Says that the callback result is available. */
     void *result;                /**< Holds the return value of the callback. */
-}ThreadFuture;
+}lpx_thread_future_t;
 
 /**
  * @brief A struct that contains the callback and parameter to a thread.
@@ -70,11 +70,11 @@ typedef struct __WorkItem
 {
     void *(*callback)(void *);  /**< The callback to run. */
     void *param;                /**< The parameter to the function. */
-    ThreadFuture *future;       /**< The future in which the result has to be stored. */
+    lpx_thread_future_t *future; /**< The future in which the result has to be stored. */
 }WorkItem;
 
 /* Forward declaration. */
-struct __ThreadPool;
+struct __lpx_threadpool_t;
 
 /**
  * @brief A struct to describe a thread in the pool.
@@ -84,13 +84,13 @@ typedef struct __Thread {
     int index;                    /**< The index of this thread in the pool. */
     lpx_semaphore_t workAvailable;      /**< Signals that work is available. */
     WorkItem *workItem;           /**< A work item for the worker to process. */
-    struct __ThreadPool *parent;  /**< The parent thread pool of this worker. */
+    struct __lpx_threadpool_t *parent;  /**< The parent thread pool of this worker. */
 }Thread;
 
 /**
  * @brief A struct to describe a pool of threads.
  */
-typedef struct __ThreadPool {
+typedef struct __lpx_threadpool_t {
     int minThreads;              /**< The minimum number of threads in the pool. */
     int maxThreads;              /**< The maximum number of threads in the pool. */
     int numAlive;                /**< The number of threads alive. */
@@ -98,7 +98,7 @@ typedef struct __ThreadPool {
     char *availability;          /**< Which threads are available. */
     pthread_mutex_t avlblMutex;  /**< Protects the available array. */
     lpx_semaphore_t threadCounter;     /**< Counts the number of available threads. */
-}ThreadPool;
+}lpx_threadpool_t;
 
 /**
  * @brief A structure to represent a barrier.
@@ -114,26 +114,23 @@ typedef struct __lpx_barrier_t {
 /**
  * @brief An enum to define the types of thread pools.
  */
-typedef enum __PoolType 
+typedef enum __lpx_pool_type 
 {
     THREAD_POOL_FIXED,    /**< The number of threads in the pool stays fixed */ 
     THREAD_POOL_VARIABLE  /**< The number of threads in the pool grows & shrinks */
-}PoolType;
+}lpx_pool_type;
 
-ThreadPool *threadPoolInit(int minThreads, int maxThreads, PoolType type);
-int threadPoolDestroy(ThreadPool *pool);
-ThreadFuture *threadPoolExecute(ThreadPool *pool,
-                                void *(*callback)(void *),
-                                void *param);
-int threadPoolJoin(ThreadFuture *future, void **retval);
+lpx_threadpool_t *lpx_threadpool_init(int minThreads, int maxThreads, 
+                                                   lpx_pool_type type);
+int lpx_threadpool_destroy(lpx_threadpool_t *pool);
+lpx_thread_future_t *lpx_threadpool_execute(lpx_threadpool_t *pool,
+                                            void *(*callback)(void *),
+                                            void *param);
+int lpx_threadpool_join(lpx_thread_future_t *future, void **retval);
 
-int getFirstAvailableWorker(ThreadPool *pool);
-int signalWorker(Thread *worker);
-int addNewWorker(ThreadPool *pool);
-
-int lpx_create_barrier(lpx_barrier_t *, int);
-int lpx_barrier_sync(lpx_barrier_t *);
-int lpx_destroy_barrier(lpx_barrier_t *);
+int lpx_create_barrier(lpx_barrier_t *barrier, int);
+int lpx_barrier_sync(lpx_barrier_t *barrier);
+int lpx_destroy_barrier(lpx_barrier_t *barrier);
 
 void *worker(void *param);
 

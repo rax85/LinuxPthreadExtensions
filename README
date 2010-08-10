@@ -6,6 +6,13 @@ This library provides some functionality that I thought would be a nice
 addition to the stock pthread library. 
 
 I. NEWS!
+    - Aug 09 2010 : The big refactoring! I've changed all the external interfaces into the
+      library to use underscore naming style instead of camel case consistently. I have no
+      particular bias towards either, the internal stuff still uses camel case. Earlier it 
+      was a big mess of both conventtions so I just wanted to make it consistent once now 
+      so that when I use it elsewhere, the refactoring exercise will be a lot less painful.
+      Needless to say, all the tests still pass with 0 memory leaks.
+
     - Aug 08 2010 : Ran the test code under valgrind to check for memory leaks. As of now, 
       valgrind does not report any memory leaks.
 
@@ -27,6 +34,9 @@ II. This is a list of currently available and planned functionality:
 
 III. Building.
     - 'make' builds the library.
+    - The default build has debug symbols on. You might want to switch that off before
+      doing anything serious. To build without debug symbols, remove the '-g' flag from
+      COPTS in the Makefile. 
     - 'make documentation' builds doxygen documentation. You need doxygen for this
       target to build.
     - 'make test' builds test.out a binary that runs a few simple tests.

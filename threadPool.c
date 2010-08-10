@@ -20,6 +20,11 @@
 
 #include "threadPool.h"
 
+/* Forward declarations of internal functions. */
+static int getFirstAvailableWorker(lpx_threadpool_t *pool);
+static int signalWorker(Thread *worker);
+static int addNewWorker(lpx_threadpool_t *pool);
+
 /**
  * @brief  Initialize a thread pool.
  * @param  minThreads The minimum number of threads in the pool.
@@ -27,9 +32,9 @@
  * @param  type       The type of thread pool.
  * @return A ThreadPool on success, NULL on failure.
  */
-ThreadPool *threadPoolInit(int minThreads, int maxThreads, PoolType type)
+lpx_threadpool_t *lpx_threadpool_init(int minThreads, int maxThreads, lpx_pool_type type)
 {
-    ThreadPool *pool = NULL;
+    lpx_threadpool_t *pool = NULL;
     int i = 0;
 
     /* Validate all the input parameters. */
@@ -50,7 +55,7 @@ ThreadPool *threadPoolInit(int minThreads, int maxThreads, PoolType type)
     }
 
     /* All parameters are ok, start initializing the thread pool. */
-    pool = (ThreadPool *)malloc(sizeof(ThreadPool));
+    pool = (lpx_threadpool_t *)malloc(sizeof(lpx_threadpool_t));
     pool->minThreads = minThreads;
     pool->maxThreads = maxThreads;
 
@@ -102,7 +107,7 @@ pool_destroy1: free(pool);
  * @param  pool The thread pool to destroy.
  * @return 0 on success, -1 on failure.
  */
-int threadPoolDestroy(ThreadPool *pool)
+int lpx_threadpool_destroy(lpx_threadpool_t *pool)
 {
     int i = 0;
     Thread *runnable = NULL;
@@ -155,13 +160,14 @@ int threadPoolDestroy(ThreadPool *pool)
  * @param  pool     The thread pool from which to grab a thread.
  * @param  callback The callback function to run.
  * @param  param    The param to pass to the callback function.
- * @return A ThreadFuture object that will eventually hold the return value. 
+ * @return A lpx_thread_future_t object that will eventually hold the return value. 
  */
-ThreadFuture *threadPoolExecute(ThreadPool *pool, void *(*callback)(void *), void *param)
+lpx_thread_future_t *lpx_threadpool_execute(lpx_threadpool_t *pool, 
+                                            void *(*callback)(void *), void *param)
 {
     int runnableIndex = -1;
     Thread *runnable = NULL;
-    ThreadFuture *future = NULL;
+    lpx_thread_future_t *future = NULL;
     WorkItem *workItem = NULL;
 
     /* Validate all the parameters. */
@@ -170,7 +176,7 @@ ThreadFuture *threadPoolExecute(ThreadPool *pool, void *(*callback)(void *), voi
     }
 
     /* Create a future to store the results in. */
-    future = (ThreadFuture *)malloc(sizeof(ThreadFuture));
+    future = (lpx_thread_future_t *)malloc(sizeof(lpx_thread_future_t));
     if (future == NULL) {
         return NULL;
     }
@@ -244,7 +250,7 @@ ThreadFuture *threadPoolExecute(ThreadPool *pool, void *(*callback)(void *), voi
  * @param  retval The value that the thread returned.
  * @return 0 on success, -1 on failure.
  */
-int threadPoolJoin(ThreadFuture *future, void **retval)
+int lpx_threadpool_join(lpx_thread_future_t *future, void **retval)
 {
     /* Validate all the parameters. */
     if (future == NULL || retval == NULL) {
@@ -270,7 +276,7 @@ int threadPoolJoin(ThreadFuture *future, void **retval)
  * @param  pool The pool from which a worker is desired.
  * @return The index of the first available thread in the pool.
  */
-int getFirstAvailableWorker(ThreadPool *pool)
+int getFirstAvailableWorker(lpx_threadpool_t *pool)
 {
     int index = 0;
     int availableIndex = -1;
@@ -317,7 +323,7 @@ int signalWorker(Thread *worker)
  * @param  pool The pool to grow.
  * @return 0 on success -1 on failure.
  */
-int addNewWorker(ThreadPool *pool)
+int addNewWorker(lpx_threadpool_t *pool)
 {
     int currentIndex = 0;
     Thread *runnable = NULL;
@@ -373,12 +379,12 @@ destroy_thread1: free(runnable);
 void *worker(void *param)
 {
     Thread *runnable = (Thread *)param;
-    ThreadPool *parent = runnable->parent;
+    lpx_threadpool_t *parent = runnable->parent;
     int index = runnable->index;
 
     void *retval = NULL;
     WorkItem *workItem = NULL;
-    ThreadFuture *future = NULL;
+    lpx_thread_future_t *future = NULL;
 
     while (1) {
         // Wait for some work to be available.
