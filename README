@@ -32,6 +32,9 @@ II. This is a list of currently available and planned functionality:
         - Memory pools with support for fixed sized allocation are implemented and minimally tested.
         - Memory pools with support for variable sized allocation is now coded and minimally tested.
 
+    4. Producer Consumer Queue.
+        - A general purpose queue that can be used in producer consumer situations. [Planned]
+
 III. Building.
     - 'make' builds the library.
     - The default build has debug symbols on. You might want to switch that off before
