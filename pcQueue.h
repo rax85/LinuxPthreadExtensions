@@ -1,8 +1,8 @@
 /**
- * @file   
- * @brief  
+ * @file   pcQueue.h 
+ * @brief  The interface to the producer consumer queue.
  * @author Rakesh Iyer.
- * @bug    Not tested.
+ * @bug    Not performance tested.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -22,6 +22,8 @@
 #define __PCQUEUE_H
 
 #include "mempool.h"
+#include "pthread.h"
+#include "sem.h"
 
 
 /**
@@ -56,8 +58,9 @@ typedef struct __lpx_pcq_node_t {
  */
 typedef struct __lpx_pcq_t {
     int maxSize;		/**< The maximum number of items in the queue. */
-    lpx_mempool_fixed pool;	/**< Pool for storing the nodes. */
-    lpx_semaphore_t sem;	/**< Semaphore to keep count of available data. */
+    lpx_mempool_fixed_t pool;	/**< Pool for storing the nodes. */
+    lpx_semaphore_t dqSem;	/**< Semaphore to keep count of available data. */
+    lpx_semaphore_t nqSem;	/**< Semaphore to keep count of available slots. */
     pthread_mutex_t qMutex;	/**< Mutex to protect the queue. */
     lpx_pcq_node_t *head;	/**< Pointer to the head of the queue. */
     lpx_pcq_node_t *tail;	/**< Pointer to teh tail of the queue. */
@@ -66,8 +69,8 @@ typedef struct __lpx_pcq_t {
 int lpx_pcq_init(lpx_pcq_t *queue, int queueDepth);
 int lpx_pcq_enqueue(lpx_pcq_t *queue, void *data);
 int lpx_pcq_dequeue(lpx_pcq_t *queue, void **data);
-int lpx_pcq_timed_enqueue(lpx_pcq_t *queue, void *data, int timeout);
-int lpx_pcq_timed_dequeue(lpx_pcq_t *queue, void **data, int timeout);
+int lpx_pcq_timed_enqueue(lpx_pcq_t *queue, void *data, long timeout);
+int lpx_pcq_timed_dequeue(lpx_pcq_t *queue, void **data, long timeout);
 int lpx_pcq_destroy(lpx_pcq_t *queue);
 
 #endif

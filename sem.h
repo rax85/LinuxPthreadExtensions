@@ -2,7 +2,7 @@
  * @file   sem.h
  * @author Rakesh Iyer
  * @brief  Interface for the pthread semaphore implementation.
- * @bug    Not tested for performance or memory leaks.
+ * @bug    Not tested for performance.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by

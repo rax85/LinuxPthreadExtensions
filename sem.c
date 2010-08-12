@@ -3,7 +3,7 @@
  * @author Rakesh Iyer
  * @brief  A semaphore implementation that is built around pthread mutexes and
  *         condition variables. Supposedly better than a posix semaphore.
- * @bug    Not tested for performance or memory leaks.
+ * @bug    Not tested for performance.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -240,8 +240,8 @@ int lpx_sem_timed_down(lpx_semaphore_t *sem, int value, long timeoutMillis)
 
     // Grab the mutex with a maximum of the specified timeout.
     clock_gettime(CLOCK_REALTIME, &before);
-    if (pthread_mutex_timedlock(&sem->sem_mutex, &timeout) != 0) {
-        if (errno == ETIMEDOUT) {
+    if ((retval = pthread_mutex_timedlock(&sem->sem_mutex, &timeout)) != 0) {
+        if (retval == ETIMEDOUT) {
             return SEMAPHORE_TIMEOUT;
         } else {
             return SEMAPHORE_FAILURE;
@@ -261,17 +261,17 @@ int lpx_sem_timed_down(lpx_semaphore_t *sem, int value, long timeoutMillis)
         timeout = timeoutToTimespec(timeoutMillis);
         clock_gettime(CLOCK_REALTIME, &before);
         retval = pthread_cond_timedwait(&sem->sem_cvar, &sem->sem_mutex, &timeout);
+        
         clock_gettime(CLOCK_REALTIME, &after);
-
         timeoutMillis -= timespecDiffMillis(after, before);
         
         // Cvar wait timed out or failed.
+        if (retval == ETIMEDOUT) {
+           pthread_mutex_unlock(&sem->sem_mutex);
+           return SEMAPHORE_TIMEOUT;
+        }
         if (retval != 0) {
-            if (errno == ETIMEDOUT) {
-                return SEMAPHORE_TIMEOUT;
-            } else {
-                return SEMAPHORE_FAILURE;
-            }
+           return SEMAPHORE_FAILURE;
         }
 
         // Cvar wait succeeded but we dont have any more time left. Too bad.
@@ -304,6 +304,7 @@ int lpx_sem_timed_down(lpx_semaphore_t *sem, int value, long timeoutMillis)
 int lpx_sem_timed_up(lpx_semaphore_t *sem, int value, long timeoutMillis)
 {
     struct timespec timeout;
+    int retval = 0;
 
     if (sem == NULL || sem->initialized != SEMAPHORE_INITIALIZED) {
         return SEMAPHORE_FAILURE;
@@ -316,8 +317,8 @@ int lpx_sem_timed_up(lpx_semaphore_t *sem, int value, long timeoutMillis)
     }
 
     // Grab the mutex.
-    if (pthread_mutex_timedlock(&sem->sem_mutex, &timeout) != 0) {
-        if (errno == ETIMEDOUT) {
+    if ((retval = pthread_mutex_timedlock(&sem->sem_mutex, &timeout)) != 0) {
+        if (retval == ETIMEDOUT) {
             return SEMAPHORE_TIMEOUT;
         } else {
             return SEMAPHORE_FAILURE;

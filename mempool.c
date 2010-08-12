@@ -3,7 +3,7 @@
  * @brief  An implementation of a fixed sized and variable sized pooled memory
  *         allocator. Specifies a mutex protected and unprotected version.
  * @author Rakesh Iyer.
- * @bug    Not tested for performance or memory leaks.
+ * @bug    Not tested for performance.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -20,6 +20,15 @@
  */
 
 #include "mempool.h"
+
+// Forward declarations of functions for internal consumption of the library.
+static void *findFirstFit(lpx_mempool_variable_t *, long);
+static void *splitBlock(lpx_mempool_variable_t *, void *, long *);
+static void insertIntoFreeList(lpx_mempool_variable_t *, void *);
+static void insertAfter(long *, long *);
+static void insertBefore(long *, long *);
+static void coalesceBlocks(long *, long *, long *);
+static void coalesce(long *, long *);
 
 /**
  * @brief  Create a memory pool that can allocate fixed sized objects.

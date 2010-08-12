@@ -6,6 +6,9 @@ This library provides some functionality that I thought would be a nice
 addition to the stock pthread library. 
 
 I. NEWS!
+    - Aug 12 2010 : Implemented a producer consumer style queue with both blocking and 
+      timed versions of the enqueue and dequeue operations.
+
     - Aug 09 2010 : The big refactoring! I've changed all the external interfaces into the
       library to use underscore naming style instead of camel case consistently. I have no
       particular bias towards either, the internal stuff still uses camel case. Earlier it 
@@ -33,7 +36,9 @@ II. This is a list of currently available and planned functionality:
         - Memory pools with support for variable sized allocation is now coded and minimally tested.
 
     4. Producer Consumer Queue.
-        - A general purpose queue that can be used in producer consumer situations. [Planned]
+        - A general purpose queue that can be used in producer consumer situations is now
+         implemented and minimally tested. The timed enqueue and dequeue probably need some work
+         to be more accurate about timeouts.
 
 III. Building.
     - 'make' builds the library.

@@ -7,6 +7,7 @@
 #include "threadPool.h"
 #include "sem.h"
 #include "mempool.h"
+#include "pcQueue.h"
 #include <assert.h>
 
 
@@ -45,7 +46,11 @@ void testSem2()
     assert(retval == 0);
     // This one should time out.
     retval = lpx_sem_timed_op(&sem, -2, 5000);
-    assert(retval != 0);
+    assert(retval == -2);
+    retval = lpx_sem_timed_op(&sem, -2, 5000);
+    assert(retval == -2);
+    assert(0 == lpx_sem_up(&sem));
+    assert(0 == lpx_sem_down(&sem));
     assert(lpx_sem_destroy(&sem) == 0);
     printf("Test testSem2 passed.\n");
     return;
@@ -472,6 +477,126 @@ void testVariableMemPool2()
 }
 
 
+//------------------------ producer consumer queue Tests ------------------------
+
+/**
+ * @brief Check the fifo-ness of the producer consumer queue.
+ */
+void testPcq1()
+{
+    lpx_pcq_t queue;
+    int in1 = 1;
+    int in2 = 2;
+    int in3 = 3;
+    int *out1 = NULL;
+    int *out2 = NULL;
+    int *out3 = NULL;
+
+    printf("=======================================\n");
+    assert(0 == lpx_pcq_init(&queue, 3));
+
+    assert(0 == lpx_pcq_enqueue(&queue, &in1));
+    assert(0 == lpx_pcq_enqueue(&queue, &in2));
+    assert(0 == lpx_pcq_enqueue(&queue, &in3));
+
+    assert(0 == lpx_pcq_dequeue(&queue, (void **)&out1)); 
+    assert(0 == lpx_pcq_dequeue(&queue, (void **)&out2)); 
+    assert(0 == lpx_pcq_dequeue(&queue, (void **)&out3));
+
+    assert(in1 == *out1);
+    assert(in2 == *out2);
+    assert(in3 == *out3);
+
+    assert(0 == lpx_pcq_destroy(&queue));
+
+    printf("Test testPcq1 passed.\n");
+}
+
+/**
+ * @brief Check that the queue can be utilized completely.
+ */
+void testPcq2()
+{
+    lpx_pcq_t queue;
+    int in1 = 1;
+    int in2 = 2;
+    int in3 = 3;
+    int in4 = 4;
+    int in5 = 5;
+
+    int *out1 = NULL;
+    int *out2 = NULL;
+    int *out3 = NULL;
+    int *out4 = NULL;
+    int *out5 = NULL;
+
+    printf("=======================================\n");
+    assert(0 == lpx_pcq_init(&queue, 3));
+
+    assert(0 == lpx_pcq_enqueue(&queue, &in1));
+    assert(0 == lpx_pcq_enqueue(&queue, &in2));
+    assert(0 == lpx_pcq_enqueue(&queue, &in3));
+
+    assert(0 == lpx_pcq_dequeue(&queue, (void **)&out1)); 
+    assert(0 == lpx_pcq_dequeue(&queue, (void **)&out2)); 
+    
+    assert(0 == lpx_pcq_enqueue(&queue, &in4));
+    assert(0 == lpx_pcq_enqueue(&queue, &in5));
+    
+    assert(0 == lpx_pcq_dequeue(&queue, (void **)&out3));
+    assert(0 == lpx_pcq_dequeue(&queue, (void **)&out4)); 
+    assert(0 == lpx_pcq_dequeue(&queue, (void **)&out5)); 
+
+    assert(in1 == *out1);
+    assert(in2 == *out2);
+    assert(in3 == *out3);
+    assert(in4 == *out4);
+    assert(in5 == *out5);
+
+    assert(0 == lpx_pcq_destroy(&queue));
+
+    printf("Test testPcq2 passed.\n");
+}
+
+/**
+ * @brief Check that enqueues and dequeues time out.
+ */
+void testTimedPcq1()
+{
+    lpx_pcq_t queue;
+    int in1 = 1;
+    int in2 = 2;
+    int in3 = 3;
+    int in4 = 3;
+    int *out1 = NULL;
+    int *out2 = NULL;
+    int *out3 = NULL;
+    int *out4 = NULL;
+
+    printf("=======================================\n");
+    assert(0 == lpx_pcq_init(&queue, 3));
+
+    assert(0 == lpx_pcq_timed_enqueue(&queue, &in1, 1000));
+    assert(0 == lpx_pcq_timed_enqueue(&queue, &in2, 1000));
+    assert(0 == lpx_pcq_timed_enqueue(&queue, &in3, 1000));
+    assert(-2 == lpx_pcq_timed_enqueue(&queue, &in4, 1000));
+
+    assert(0 == lpx_pcq_timed_dequeue(&queue, (void **)&out1, 1000)); 
+    assert(0 == lpx_pcq_timed_dequeue(&queue, (void **)&out2, 1000)); 
+    assert(0 == lpx_pcq_timed_dequeue(&queue, (void **)&out3, 1000));
+    assert(-2 == lpx_pcq_timed_dequeue(&queue, (void **)&out4, 1000));
+
+    assert(in1 == *out1);
+    assert(in2 == *out2);
+    assert(in3 == *out3);
+    assert(NULL == out4);
+
+    assert(0 == lpx_pcq_destroy(&queue));
+
+    printf("Test testTimedPcq1 passed.\n");
+}
+
+
 /**
  * @brief Entry point into the test program.
  * @param argc Number of arguments.
@@ -493,6 +618,9 @@ int main(int argc, char **argv)
     testFixedMemPool2();
     testVariableMemPool1();
     testVariableMemPool2();
+    testPcq1();
+    testPcq2();
+    testTimedPcq1();
     return 0;
 }
 

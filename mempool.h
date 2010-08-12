@@ -7,7 +7,7 @@
  *         the global heap of the program. Also, releasing the entire pool at thread
  *         exit allows for any leaked memory to be reclaimed.
  * @author Rakesh Iyer.
- * @bug    Not tested for performance or memory leaks.
+ * @bug    Not tested for performance.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -138,14 +138,5 @@ int lpx_mempool_create_variable_pool(lpx_mempool_variable_t *pool, long, int);
 void *lpx_mempool_variable_alloc(lpx_mempool_variable_t *pool, long size);
 int lpx_mempool_variable_free(void *addr);
 int lpx_mempool_destroy_variable_pool(lpx_mempool_variable_t *pool);
-
-// Functions for internal consumption of the library.
-static void *findFirstFit(lpx_mempool_variable_t *, long);
-static void *splitBlock(lpx_mempool_variable_t *, void *, long *);
-static void insertIntoFreeList(lpx_mempool_variable_t *, void *);
-static void insertAfter(long *, long *);
-static void insertBefore(long *, long *);
-static void coalesceBlocks(long *, long *, long *);
-static void coalesce(long *, long *);
 
 #endif
