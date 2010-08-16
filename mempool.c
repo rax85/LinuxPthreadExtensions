@@ -211,6 +211,25 @@ int lpx_mempool_destroy_fixed_pool(lpx_mempool_fixed_t *pool)
     return MEMPOOL_SUCCESS;
 }
 
+
+/**
+ * @brief  Create a memory pool that can allocate variable sized objects inside an
+ *         existing block of memory.
+ * @param  pool The pool to allocate from.
+ * @param  size The total size of the memory pool.
+ * @param  isProtected Should the pool be protected by a mutex?
+ * @param  base The block of memory for the pool to be created in.
+ * @return 0 on success, -1 on failure.
+ */
+int lpx_mempool_create_variable_pool_from_block(lpx_mempool_variable_t *pool, 
+                                                long size, 
+						int isProtected, 
+						void *base)
+{
+    return MEMPOOL_SUCCESS;
+}
+
+
 /**
  * @brief  Create a memory pool that can allocate variable sized objects.
  * @param  pool The pool to allocate from.
