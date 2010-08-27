@@ -22,6 +22,11 @@
 #define __TCPSERVER_H__
 
 #include "mempool.h"
+#include "sem.h"
+#include "pcQueue.h"
+#include "threadPool.h"
+#include <sys/socket.h>
+#include <netinet/in.h>
 
 /**
  * @def   TCPSERVER_SUCCESS
@@ -42,21 +47,48 @@
  */
 #define TCPSERVER_TIMEOUT		-2
 
+struct __lpx_connection_data_t;
+
 /**
  * @brief The structure that represents a tcp server.
  */
 typedef struct __lpx_tcpserver_t {
-    unsigned short port;	/**< The port that this server is listening on. */
+    int numWorkers; 		     /**< Number of workers. */
+    lpx_thread_future_t **futures;   /**< Futures for each of the threads. */
+    lpx_thread_future_t *dispatcher; /**< Future of the dispatcher thread. */
+    lpx_pcq_t requestQueue;	     /**< Queue of work to do. */
+    unsigned short port;	     /**< The port that this server is listening on. */
+    int listener;                    /**< The fd of the listening socket. */
+    lpx_threadpool_t *workers;       /**< The pool of workers */
+    lpx_mempool_fixed_t cDataPool;   /**< Memory pool for connection data objects */
+    void *workerData;  		     /**< Worker data to be released later. */
+    int (*handler)(struct __lpx_connection_data_t *, int); /**< The handler that is invoked on each socket. */
 } lpx_tcpserver_t;
+
+/**
+ * @brief A structure to contain data passed to each worker.
+ */
+typedef struct __lpx_tcpworker_data_t {
+    int threadNum;                /**< The thread number of this thread. */
+    lpx_tcpserver_t *server;      /**< Back pointer to the parent server. */
+} lpx_tcpworker_data_t;
+
+/**
+ * @brief A structure to enqueue into the request queue. */
+typedef struct __lpx_connection_data_t {
+    struct sockaddr_in peer;     /**< Who is on the other side of this socket. */
+    int fd;			 /**< File descriptor of the socket. */
+    struct timespec timestamp;   /**< The time when this connection arrived. */
+    long age_milliseconds;       /**< Request age in milliseconds. */
+}lpx_connection_data_t;
 
 
 int lpx_tcpserver_init(lpx_tcpserver_t *server, 
                        unsigned short port,
 		       int num_workers,
 		       int queue_length,
-                       int (*handler)(int socketfd, lpx_mempool_variable_t *pool));
+                       int (*handler)(lpx_connection_data_t *request, int worker_index));
 int lpx_tcpserver_start(lpx_tcpserver_t *server);
 int lpx_tcpserver_clean_shutdown(lpx_tcpserver_t *server);
-int lpx_tcpserver_hard_shutdown(lpx_tcpserver_t *server);
 
 #endif

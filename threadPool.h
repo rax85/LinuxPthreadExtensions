@@ -132,6 +132,5 @@ int lpx_create_barrier(lpx_barrier_t *barrier, int);
 int lpx_barrier_sync(lpx_barrier_t *barrier);
 int lpx_destroy_barrier(lpx_barrier_t *barrier);
 
-void *worker(void *param);
 
 #endif

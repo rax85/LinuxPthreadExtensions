@@ -21,6 +21,7 @@
 #include "threadPool.h"
 
 /* Forward declarations of internal functions. */
+static void *worker(void *param);
 static int getFirstAvailableWorker(lpx_threadpool_t *pool);
 static int signalWorker(Thread *worker);
 static int addNewWorker(lpx_threadpool_t *pool);

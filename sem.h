@@ -73,4 +73,5 @@ int lpx_sem_down_multiple(lpx_semaphore_t *sem, int);
 int lpx_sem_timed_down(lpx_semaphore_t *sem, int value, long timeoutMillis);
 int lpx_sem_timed_up(lpx_semaphore_t *sem, int value, long timeoutMillis);
 
+long timespecDiffMillis(struct timespec greater, struct timespec lesser);
 #endif

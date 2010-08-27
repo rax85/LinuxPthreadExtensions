@@ -23,7 +23,6 @@
 
 /* Forward declarations of utility functions. */
 static struct timespec timeoutToTimespec(long);
-static long timespecDiffMillis(struct timespec, struct timespec);
 
 /**
  * @brief  Initialize a semaphore. Starts off as fully available.
@@ -376,7 +375,7 @@ static struct timespec timeoutToTimespec(long timeoutMillis)
  * @param  lesser  The timespec that represents the lesser value.
  * @return The difference in milliseconds.
  */
-static long timespecDiffMillis(struct timespec greater, struct timespec lesser)
+long timespecDiffMillis(struct timespec greater, struct timespec lesser)
 {
     long diff = 0;
     long nsecDiff = greater.tv_nsec - lesser.tv_nsec;
