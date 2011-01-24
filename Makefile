@@ -5,7 +5,9 @@
 ##
 
 CC=gcc
-COPTS=-g -O2 -Wall -fpic -c
+COVOPTS=-fprofile-arcs -ftest-coverage
+PROFOPTS=-pg
+COPTS=-g -O2 -Wall -fpic -c $(COVOPTS) $(PROFOPTS)
 AR=ar
 AROPTS=rcs
 
@@ -46,7 +48,7 @@ Doxyfile :
 	doxygen -g
 
 test : test.c staticlib
-	gcc -g -o test.out test.c libpthreadext.a -lpthread -lrt 
+	gcc -g -o test.out test.c libpthreadext.a -lpthread -lrt -lgcov 
 
 .PHONY clean : 
-	rm -f *.a *.so.* *.o *.out; rm -rf html; rm -rf latex; rm -f Doxyfile
+	rm -f *.a *.so.* *.o *.out *.gc*; rm -rf html; rm -rf latex; rm -f Doxyfile

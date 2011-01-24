@@ -274,7 +274,7 @@ void testThreadPool5()
  */
 #define BARRIERTEST1_NUM_THREADS	4
 
-char barrierOutArray[BARRIERTEST1_NUM_ITERATIONS]; /**< Output array for barrierTest1 threads. */
+char barrierOutArray[BARRIERTEST1_NUM_ITERATIONS * BARRIERTEST1_NUM_THREADS]; /**< Output array for barrierTest1 threads. */
 pthread_mutex_t barrierTest1Mutex;  /**< Mutex to protect barrierOutArray */
 int barrierTest1Index;   /**< Current index to write to in barrierOutArray */
 
@@ -476,6 +476,112 @@ void testVariableMemPool2()
     printf("Test testVariableMemPool2 passed.\n");
 }
 
+#define BASEF_SIZE		4096
+#define BASEV_SIZE		4096
+
+/**
+ * @brief Run some simple tests on fixed and variable pools.
+ * @param baseF The base address for the fixed pool.
+ * @param baseV The base address for the variable pool.
+ */
+void runTests(void *baseF, void *baseV) 
+{
+    void *fobjects[31];
+    void *vobjects[10];
+    int i = 0;
+
+    // Create a fixed pool from baseF
+    lpx_mempool_fixed_t fpool;
+    assert(0 == lpx_mempool_create_fixed_pool_from_block(&fpool, 128, 31, BASEF_SIZE, MEMPOOL_UNPROTECTED, baseF));
+
+    // Allocate a bunch of stuff from the fixed pool.
+    for (i = 0; i < 31; i++) {
+        fobjects[i] = lpx_mempool_fixed_alloc(&fpool);
+	assert(NULL != fobjects[i]);
+	memset(fobjects[i], 0, 128);
+    }
+
+    // Create a variable pool from baseV
+    lpx_mempool_variable_t vpool;
+    assert(0 == lpx_mempool_create_variable_pool_from_block(&vpool, BASEV_SIZE, MEMPOOL_UNPROTECTED, baseV));
+
+    // Allocate a bunch of stuff from the variable pool.
+    for (i = 0; i < 10; i++) {
+        vobjects[i] = lpx_mempool_variable_alloc(&vpool, 128 + i);
+	assert(NULL != vobjects[i]);
+	memset(vobjects[i], 1, 128 + i);
+    }
+
+    // Deallocate fixed.
+    for (i = 0; i < 31; i++) {
+        lpx_mempool_fixed_free(fobjects[i]);
+    }
+
+    // Deallocate variable.
+    for (i = 0; i < 10; i++) {
+        lpx_mempool_variable_free(vobjects[i]);
+    }
+
+    // Don't destroy the fixed pool that we created from the block.
+    // Don't destroy the variable pool that we created from the block.
+}
+
+/**
+ * @brief Test the creation of pools within fixed pools. This is more of a demo
+ *        of how to use this functionality really.
+ */
+void testPoolsFromFixedPool()
+{
+    lpx_mempool_fixed_t parentPool;
+    void *baseF;
+    void *baseV;
+
+    printf("=======================================\n");
+    assert(0 == lpx_mempool_create_fixed_pool(&parentPool, BASEF_SIZE, 2, MEMPOOL_PROTECTED));
+    baseF = lpx_mempool_fixed_alloc(&parentPool);
+    assert(baseF != NULL);
+    memset(baseF, 0, BASEF_SIZE);
+    
+    baseV = lpx_mempool_fixed_alloc(&parentPool);
+    assert(baseV != NULL);
+    memset(baseV, 1, BASEV_SIZE);
+
+    runTests(baseF, baseV);
+
+    assert(0 == lpx_mempool_fixed_free(baseF));
+    assert(0 == lpx_mempool_fixed_free(baseV));
+
+    assert(0 == lpx_mempool_destroy_fixed_pool(&parentPool));
+    printf("Test testPoolsFromFixedPool passed.\n");
+}
+
+/**
+ * @brief Test the creation of pools within variable pools. Again, more of a demo.
+ */
+void testPoolsFromVariablePool()
+{
+    lpx_mempool_variable_t parentPool;
+    void *baseF;
+    void *baseV;
+
+    printf("=======================================\n");
+    assert(0 == lpx_mempool_create_variable_pool(&parentPool, BASEF_SIZE + BASEV_SIZE + 128, MEMPOOL_PROTECTED));
+    baseF = lpx_mempool_variable_alloc(&parentPool, BASEF_SIZE);
+    assert(baseF != NULL);
+    memset(baseF, 0, BASEF_SIZE);
+    
+    baseV = lpx_mempool_variable_alloc(&parentPool, BASEV_SIZE);
+    assert(baseV != NULL);
+    memset(baseV, 1, BASEV_SIZE);
+
+    runTests(baseF, baseV);
+    assert(0 == lpx_mempool_variable_free(baseF));
+    assert(0 == lpx_mempool_variable_free(baseV));
+
+    assert(0 == lpx_mempool_destroy_variable_pool(&parentPool));
+    printf("Test testPoolsFromVariablePool passed.\n");
+}
+
 
 //------------------------ producer consumer queue Tests ------------------------
 
@@ -618,6 +724,8 @@ int main(int argc, char **argv)
     testFixedMemPool2();
     testVariableMemPool1();
     testVariableMemPool2();
+    testPoolsFromFixedPool();
+    testPoolsFromVariablePool();
     testPcq1();
     testPcq2();
     testTimedPcq1();

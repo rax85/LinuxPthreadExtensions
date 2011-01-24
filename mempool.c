@@ -45,11 +45,48 @@ int lpx_mempool_create_fixed_pool(lpx_mempool_fixed_t *pool,
                                   int numObjects, 
                                   int isProtected)
 {
+    if (pool == NULL || objectSize <= 0 || numObjects <= 0) {
+        return MEMPOOL_FAILURE;
+    }
+
+    // Get all the memory needed up front.
+    unsigned long baseSize  = (objectSize + MEMPOOL_PER_OBJECT_OVERHEAD) * numObjects;
+    void *base = malloc(baseSize);
+    if (base == NULL) {
+        return MEMPOOL_FAILURE;
+    }
+
+    return lpx_mempool_create_fixed_pool_from_block(pool, objectSize, numObjects, baseSize, isProtected, base);
+}
+
+/**
+ * @brief  Create a memory pool that can allocate fixed sized objects inside an
+ *         existing block of memory. Note that you need to destroy pools created in this way
+ *         by destroying the block of memory (*base) itself, ie if it was obtained from another pool 
+ *         call, you should deallocate that block. If you call mempool destroy on this, it will 
+ *         most likely cause a segfault. If base was created using malloc, then just call free on base
+ *         and your pool is gone. See the tests for an example of how to use these pools.
+ * @param  pool       The pool to create.
+ * @param  objectSize The size of each object in the pool.
+ * @param  numObjects Number of objects desired in the pool.
+ * @param  size       Size of the block provided.
+ * @param  isProtected Should the pool be protected by a mutex.
+ * @param  base       The block of memory. Should be atleast (objectSize + MEMPOOL_PER_OBJECT_OVERHEAD) * numObjects.
+ * @return 0 on success -1 on failure.
+ */
+int lpx_mempool_create_fixed_pool_from_block(lpx_mempool_fixed_t *pool,
+                                             long objectSize,
+					     int numObjects,
+                                             long size,
+                                             int isProtected,
+					     void *base)
+{
     long *currentBlockHeader = NULL;
     long storedObjectSize = 0;
     int i = 0;
 
-    if (pool == NULL || objectSize <= 0 || numObjects <= 0) {
+    if (pool == NULL || base == NULL || objectSize <= 0 || 
+        numObjects <= 0 || size < objectSize + MEMPOOL_PER_OBJECT_OVERHEAD) {
         return MEMPOOL_FAILURE;
     }
 
@@ -61,19 +98,20 @@ int lpx_mempool_create_fixed_pool(lpx_mempool_fixed_t *pool,
         }
 
         if (0 != pthread_mutex_init(pool->poolMutex, NULL)) {
-	    goto cfpool_destroy1;
+	    goto cfbpool_destroy1;
 	}
     } else {
         pool->poolMutex = NULL;
     }
 
-    // Get all the memory needed up front.
+    // Sanitize the size of the block of memory provided and give it to the pool for initialization.
     pool->storedObjectSize = objectSize + MEMPOOL_PER_OBJECT_OVERHEAD;
     pool->poolSize = pool->storedObjectSize * numObjects;
-    pool->pool = malloc(pool->poolSize);
-    if (pool->pool == NULL) {
-        goto cfpool_destroy2;
-    }
+
+    if (size < pool->poolSize) {
+        goto cfbpool_destroy2;
+    } 
+    pool->pool = base;
 
     // Initialize the memory pool. Pay the cost of initializing the data structure
     // upfront so that allocations become deterministic time.
@@ -94,10 +132,11 @@ int lpx_mempool_create_fixed_pool(lpx_mempool_fixed_t *pool,
 
     return MEMPOOL_SUCCESS;
 
-cfpool_destroy2: if (pool->poolMutex != NULL) { pthread_mutex_destroy(pool->poolMutex); }
-cfpool_destroy1: free(pool->poolMutex);
+cfbpool_destroy2: if (pool->poolMutex != NULL) { pthread_mutex_destroy(pool->poolMutex); }
+cfbpool_destroy1: free(pool->poolMutex);
     return MEMPOOL_FAILURE;
 }
+
 
 /**
  * @brief  Allocate an object from a fixed sized pool.
@@ -215,8 +254,8 @@ int lpx_mempool_destroy_fixed_pool(lpx_mempool_fixed_t *pool)
 /**
  * @brief  Create a memory pool that can allocate variable sized objects inside an
  *         existing block of memory.
- * @param  pool The pool to allocate from.
- * @param  size The total size of the memory pool.
+ * @param  pool The pool to allocate create.
+ * @param  size The total size of the block provided.
  * @param  isProtected Should the pool be protected by a mutex?
  * @param  base The block of memory for the pool to be created in.
  * @return 0 on success, -1 on failure.
@@ -226,23 +265,13 @@ int lpx_mempool_create_variable_pool_from_block(lpx_mempool_variable_t *pool,
 						int isProtected, 
 						void *base)
 {
-    return MEMPOOL_SUCCESS;
-}
-
-
-/**
- * @brief  Create a memory pool that can allocate variable sized objects.
- * @param  pool The pool to allocate from.
- * @param  size The total size of the memory pool.
- * @param  isProtected Should the pool be protected by a mutex?
- * @return 0 on success, -1 on failure.
- */
-int lpx_mempool_create_variable_pool(lpx_mempool_variable_t *pool, 
-                                     long size, int isProtected)
-{
     long *blockMetadata = NULL;
 
-    if (pool == NULL) {
+    if (pool == NULL || base == NULL) {
+        return MEMPOOL_FAILURE;
+    }
+
+    if (size <= MEMPOOL_PER_BLOCK_OVERHEAD) {
         return MEMPOOL_FAILURE;
     }
 
@@ -261,15 +290,8 @@ int lpx_mempool_create_variable_pool(lpx_mempool_variable_t *pool,
     }
 
     // Allocate all the memory up front.
-    size += MEMPOOL_PER_BLOCK_OVERHEAD;
-    pool->pool = malloc(size);
-    if (pool->pool == NULL) {
-        if (NULL != pool->poolMutex) {
-	    pthread_mutex_destroy(pool->poolMutex);
-	    free(pool->poolMutex);
-	    return MEMPOOL_FAILURE;
-	}
-    }
+    // size -= MEMPOOL_PER_BLOCK_OVERHEAD;
+    pool->pool = base;
     pool->poolSize = size;
     pool->freeList = pool->pool;
 
@@ -283,6 +305,33 @@ int lpx_mempool_create_variable_pool(lpx_mempool_variable_t *pool,
     pool->magic = MEMPOOL_VARIABLE_MAGIC;
 
     return MEMPOOL_SUCCESS;
+}
+
+
+
+/**
+ * @brief  Create a memory pool that can allocate variable sized objects.
+ * @param  pool The pool to allocate from.
+ * @param  size The total size of the memory pool.
+ * @param  isProtected Should the pool be protected by a mutex?
+ * @return 0 on success, -1 on failure.
+ */
+int lpx_mempool_create_variable_pool(lpx_mempool_variable_t *pool, 
+                                     long size, int isProtected)
+{
+    if (pool == NULL) {
+        return MEMPOOL_FAILURE;
+    }
+
+    // Allocate all the memory up front.
+    size += MEMPOOL_PER_BLOCK_OVERHEAD;
+    void *base  = malloc(size);
+    if (base == NULL) {
+        free(pool->poolMutex);
+	return MEMPOOL_FAILURE;
+    }
+
+    return lpx_mempool_create_variable_pool_from_block(pool, size, isProtected, base);
 }
 
 /**
