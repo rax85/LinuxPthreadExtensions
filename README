@@ -6,6 +6,10 @@ This library provides some functionality that I thought would be a nice
 addition to the stock pthread library. 
 
 I. NEWS!
+    - Jan 23 2011 : Updates after a long break. Added the capability to create memory 
+      pools inside of already allocated memory blocks. Fixed up the makefile so to 
+      enable running the tests using gcov.
+
     - Aug 12 2010 : Implemented a producer consumer style queue with both blocking and 
       timed versions of the enqueue and dequeue operations.
 
@@ -34,6 +38,8 @@ II. This is a list of currently available and planned functionality:
     3. Memory pools
         - Memory pools with support for fixed sized allocation are implemented and minimally tested.
         - Memory pools with support for variable sized allocation is now coded and minimally tested.
+        - Memory pools can be created from blocks of memory or directly, where they the
+          create methods internally call malloc.
 
     4. Producer Consumer Queue.
         - A general purpose queue that can be used in producer consumer situations is now
