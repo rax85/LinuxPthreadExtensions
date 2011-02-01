@@ -141,7 +141,9 @@ int lpx_mempool_fixed_free(void *addr);
 int lpx_mempool_destroy_fixed_pool(lpx_mempool_fixed_t *pool);
 
 int lpx_mempool_create_variable_pool(lpx_mempool_variable_t *pool, long, int);
-int lpx_mempool_create_variable_pool_from_block(lpx_mempool_variable_t *pool, long size, int isProtected, void *base);
+int lpx_mempool_create_variable_pool_from_block(lpx_mempool_variable_t *pool, 
+                                                long size, int isProtected, 
+                                                void *base);
 void *lpx_mempool_variable_alloc(lpx_mempool_variable_t *pool, long size);
 int lpx_mempool_variable_free(void *addr);
 int lpx_mempool_destroy_variable_pool(lpx_mempool_variable_t *pool);

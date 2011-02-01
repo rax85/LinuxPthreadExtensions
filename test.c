@@ -8,6 +8,7 @@
 #include "sem.h"
 #include "mempool.h"
 #include "pcQueue.h"
+#include "treemap.h"
 #include <assert.h>
 
 
@@ -702,6 +703,157 @@ void testTimedPcq1()
     printf("Test testTimedPcq1 passed.\n");
 }
 
+//---------------------- Test the treemap ----------------------------------
+
+/**
+ * @brief Insert steadily increasing keys.
+ * @param treemap The treemap to test.
+ */
+void treeTest1(lpx_treemap_t *treemap)
+{
+    long i = 0;
+    long j = 0;
+    long v = 0;
+    long lb = 1;
+    long ub = 100;
+
+    for (i = lb; i < ub; i++) {
+        printf ("1: Inserting %ld\n", i);
+        assert(0 == lpx_treemap_put(treemap, i, i * 1000));
+       	for (j = lb; j <= i; j++) {
+	    assert(0 == lpx_treemap_get(treemap, j, &v));
+	    assert(v == (j * 1000));
+	}
+        printf (" >> 1: Verified %ld\n", i);
+    }
+}
+
+/**
+ * @brief Insert steadily decreasing values.
+ * @param treemap The treemap to test.
+ */
+void treeTest2(lpx_treemap_t *treemap)
+{
+    long i = 0;
+    long j = 0;
+    long v = 0;
+    long lb = 1;
+    long ub = 100;
+
+    for (i = ub - 1; i >= lb; i--) {
+        printf ("2: Inserting %ld\n", i);
+        assert(0 == lpx_treemap_put(treemap, i, i * 1000));
+	for (j = ub - 1; j >= i; j--) {
+	    assert(0 == lpx_treemap_get(treemap, j, &v));
+	    assert(v == (j * 1000));
+        }
+        printf (" >> 2: Verified %ld\n", i);
+    }
+}
+
+/**
+ * @brief Mix it up a lot.
+ * @param treemap The treemap to test.
+ */
+void treeTest3(lpx_treemap_t *treemap)
+{
+    long i = 0;
+    long j = 0;
+    long v = 0;
+    long lb = 1;
+    long ub = 101;
+    long interval = ub - lb;
+
+    for (i = 0; i < interval; i++) {
+        printf("3: Inserting %ld\n", lb + i);
+	assert(0 == lpx_treemap_put(treemap, lb + i, (lb + i) * 1000));
+	for (j = lb; j <= lb + i; j++) {
+	    assert(0 == lpx_treemap_get(treemap, j, &v));
+	    assert(v == (j * 1000));
+	}
+
+	printf("3: Inserting %ld\n", ub - i);
+	assert(0 == lpx_treemap_put(treemap, ub - i, (ub - i) * 1000));
+	for (j = ub; j >= ub - i; j--) {
+	    assert(0 == lpx_treemap_get(treemap, j, &v));
+	    assert(v == (j * 1000));
+	}
+    }
+}
+
+/**
+ * @brief Steadily increasing right subtree of a left child.
+ * @param treemap The treemap to test.
+ */
+void treeTest4(lpx_treemap_t *treemap)
+{
+}
+
+/**
+ * @brief Test whether the treemap can handle left only and right only insertions
+ *        without using pooled memory.
+ */
+void testTreemapWorstCaseNoPools()
+{
+    lpx_treemap_t treemap;
+    
+    printf("=======================================\n");
+#if 0
+    assert(0 == lpx_treemap_init(&treemap, TREEMAP_UNPROTECTED));
+    treeTest1(&treemap);
+    assert(0 == lpx_treemap_destroy(&treemap));
+    
+    assert(0 == lpx_treemap_init(&treemap, TREEMAP_UNPROTECTED));
+    treeTest2(&treemap);
+    assert(0 == lpx_treemap_destroy(&treemap));
+#endif
+    assert(0 == lpx_treemap_init(&treemap, TREEMAP_UNPROTECTED));
+    treeTest3(&treemap);
+    assert(0 == lpx_treemap_destroy(&treemap));
+
+    assert(0 == lpx_treemap_init(&treemap, TREEMAP_UNPROTECTED));
+    treeTest4(&treemap);
+    assert(0 == lpx_treemap_destroy(&treemap));
+    
+    printf("Test testTreemapWorstCaseNoPools passed.\n");
+}
+
+/**
+ * @brief Test whether the treemap can handle left only and right only insertions
+ *        using pooled memory.
+ */
+void testTreemapWorstCaseWithPools()
+{
+    long i = 0;
+    long j = 0;
+    long v = 0;
+    long lb = 1;
+    long ub = 100;
+    lpx_treemap_t treemap;
+    lpx_mempool_variable_t pool;
+    printf("=======================================\n");
+    assert(0 == lpx_mempool_create_variable_pool(&pool, 4096, MEMPOOL_UNPROTECTED));
+    
+    assert(0 == lpx_treemap_init_from_pool(&treemap, TREEMAP_UNPROTECTED, &pool));
+    treeTest1(&treemap);
+    assert(0 == lpx_treemap_destroy(&treemap));
+
+    assert(0 == lpx_treemap_init_from_pool(&treemap, TREEMAP_UNPROTECTED, &pool));
+    treeTest2(&treemap);
+    assert(0 == lpx_treemap_destroy(&treemap));
+    
+    assert(0 == lpx_treemap_init_from_pool(&treemap, TREEMAP_UNPROTECTED, &pool));
+    treeTest3(&treemap);
+    assert(0 == lpx_treemap_destroy(&treemap));
+
+    assert(0 == lpx_treemap_init_from_pool(&treemap, TREEMAP_UNPROTECTED, &pool));
+    treeTest4(&treemap);
+    assert(0 == lpx_treemap_destroy(&treemap));
+
+    assert(0 == lpx_mempool_destroy_variable_pool(&pool));
+    printf("Test testTreemapWorstCaseWithPools passed.\n");
+}
+
 
 /**
  * @brief Entry point into the test program.
@@ -729,7 +881,8 @@ int main(int argc, char **argv)
     testPcq1();
     testPcq2();
     testTimedPcq1();
+    testTreemapWorstCaseWithPools();
+    testTreemapWorstCaseNoPools();
     return 0;
 }
-
 
