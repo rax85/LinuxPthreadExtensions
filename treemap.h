@@ -61,7 +61,7 @@ int lpx_treemap_put(lpx_treemap_t *treemap, unsigned long key, unsigned long val
 
 int lpx_treemap_get(lpx_treemap_t *treemap, unsigned long key, unsigned long *value);
 
-int lpx_treemap_delete(lpx_treemap_t *treemap, unsigned int key);
+int lpx_treemap_delete(lpx_treemap_t *treemap, unsigned long key);
 
 int lpx_treemap_destroy(lpx_treemap_t *treemap);
 

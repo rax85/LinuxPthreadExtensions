@@ -4,6 +4,9 @@
  * @brief  An implementation of a map based on a red black tree. For an
  *         explanation of how this worked go to:
  *         http://en.wikipedia.org/wiki/Red-black_tree
+ *
+ *         The implementation is non recursive... just because...
+ *
  * @bug    Not tested for performance.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -34,8 +37,7 @@
  */
 #define FREE(pool,ptr) (((pool) == NULL) ? free((ptr)) : lpx_mempool_variable_free((ptr)))
 
-#define PRINT_PATH	1
-#define TRACE_INSERT	1
+#define PRINT_PATH	0
 
 static int init(lpx_treemap_t *treemap, int isProtected, lpx_mempool_variable_t *pool);
 static rbnode *newNode(lpx_treemap_t *treemap, long key, long value);
@@ -49,6 +51,7 @@ static inline int isLeftChild(rbnode *parent, rbnode *child);
 static inline int isRightChild(rbnode *parent, rbnode *child);
 static void rotateLeft(lpx_treemap_t *treemap, rbnode *node);
 static void rotateRight(lpx_treemap_t *treemap, rbnode *node);
+static int delete(lpx_treemap_t *treemap, rbnode *node);
 
 /**
  * @brief Initialize the treemap.
@@ -220,9 +223,6 @@ static int insert(lpx_treemap_t *treemap, long key, long value)
 
     // Finally, if the root node ends up red, we can make it black without
     // upsetting the black count to any node.
-#if TRACE_INSERT
-    printf("Made (head) %ld black\n", treemap->head->key);
-#endif
     treemap->head->color = COLOR_BLACK;
 
     return TREEMAP_SUCCESS;
@@ -290,6 +290,7 @@ static inline rbnode *uncle(rbnode *node)
 }
 
 /**
+ *
  * @brief Resolve any red black tree conflicts after the newly added node.
  * @param treemap The treemap to check for conflicts.
  * @param node The node that we just inserted.
@@ -302,72 +303,84 @@ static void resolve_rb_conflics(lpx_treemap_t *treemap, rbnode *node)
     rbnode *currentNode = node;
     
     while (currentNode != NULL) {
-        printf("Current node is %ld\n", currentNode->key);
-        // TODO: <Insert explanation here.>
+        // The root is always black and a tree with one node is always balanced.
         // If the current node is the parent, repaint it black and get done.
         if (currentNode->parent == NULL) {
             currentNode->color = COLOR_BLACK;
             return;
         }
 
-        // TODO: <Insert explanation here.>
         // If the new node has a black parent, the tree is already balanced.
         if (isBlack(currentNode->parent)) {
             return;
         }
 
-        // TODO: <Insert explanation here.>
-        // If the uncle and parent are both red, repaint them as black and
-	// re-iterate using the grandparent.
+        /*
+	 * Handle cases like this.
+	 *                    b
+	 *                   / \
+	 *                  b   b         <- Pull the black down from here
+	 *                       \
+	 *                        r       <- To here
+	 *
+         * If the uncle and parent are both red, repaint them as black and
+	 * re-iterate using the grandparent.
+	 */
         unode = uncle(currentNode);
-        (unode != NULL) ? printf ("Uncle node is %ld\n", unode->key):printf ("Uncle node is %p\n", unode);
 	if (isRed(currentNode->parent) && isRed(unode)) {
             // Pull the black down from grandparent.
-            printf("RpRu:Made %ld black\n", currentNode->parent->key);
-            printf("RpRu:Made %ld black\n", unode->key);
 	    currentNode->parent->color = COLOR_BLACK;
 	    unode->color = COLOR_BLACK;
 
             // Make the grandparent and the current node.
             currentNode = grandparent(currentNode);
             currentNode->color = COLOR_RED;
-            printf("Made %ld red\n", currentNode->key);
 	} else {
             break;
         } 
     }
 
-    printf("Current node is now %ld\n", currentNode->key);
-    printf("Parent is red and uncle is black\n");
     // This point we know that the parent is red and the uncle is black.
     unode = uncle(currentNode);
     pnode = currentNode->parent;
     gnode = grandparent(currentNode);
 
-    // TODO: <Insert explanation here.>
+    /* 
+     * Handle situations like this.
+     *             o
+     *              \
+     *               o
+     *              / 
+     *             o
+     *            /
+     *           o
+     */
     if (isRightChild(pnode, currentNode) && isLeftChild(gnode, pnode)) {
-        printf(">> RL1..");
         rotateLeft(treemap, pnode);
         currentNode = currentNode->left;
     } else if (isLeftChild(pnode, currentNode) && isRightChild(gnode, pnode)) {
-        printf(">> RR1..");
         rotateRight(treemap, pnode);
         currentNode = currentNode->right;
     }
 
-    // TODO: <Insert explanation here.>
+    /* 
+     * Handle situations like this:
+     *             o
+     *            / \
+     *           o   o
+     *                \
+     *                 o
+     *                  \
+     *                   o
+     */
     gnode = grandparent(currentNode);
     pnode = currentNode->parent;
 
     pnode->color = COLOR_BLACK;
     gnode->color = COLOR_RED;
-    printf("Made %ld black\n", pnode->key);
-    printf("Made %ld red\n", gnode->key);
     if (isLeftChild(pnode, currentNode) && isLeftChild(gnode, pnode)) {
-        printf("RR2..");
         rotateRight(treemap, gnode);
     } else {
-        printf("RL2..");
         rotateLeft(treemap, gnode);
     }
 }
@@ -384,10 +397,6 @@ static void rotateLeft(lpx_treemap_t *treemap, rbnode *node)
     rbnode *parent = node->parent;
     rbnode *root = NULL;
     rbnode *rightChild = node->right;
-
-#if TRACE_INSERT
-    printf("Rotating left around %ld\n", node->key);
-#endif
 
     // For a left rotation first make the right child the root node.
     root = rightChild;
@@ -426,10 +435,6 @@ static void rotateRight(lpx_treemap_t *treemap, rbnode *node)
     rbnode *root = NULL;
     rbnode *leftChild = node->left;
   
-#if TRACE_INSERT
-    printf("Rotating right around %ld\n", node->key);
-#endif
-
     // For a right rotation first make the left child the root node.
     root = leftChild;
     root->parent = parent;
@@ -537,7 +542,58 @@ int lpx_treemap_get(lpx_treemap_t *treemap, unsigned long key, unsigned long *va
  * @param  key The key to delete.
  * @return 0 on success, -1 on failure.
  */
-int lpx_treemap_delete(lpx_treemap_t *treemap, unsigned int key)
+int lpx_treemap_delete(lpx_treemap_t *treemap, unsigned long key)
+{
+    int retval = TREEMAP_SUCCESS;
+
+    if (treemap == NULL) {
+        return TREEMAP_ERROR;
+    }
+
+    rbnode *currentNode = treemap->head;
+
+    // Lock the mutex.
+    if (treemap->mutex != NULL && (0 != pthread_mutex_lock(treemap->mutex))) {
+        return TREEMAP_ERROR;
+    }
+
+    // Find the node that we need to delete.
+    while (currentNode != NULL) {
+        if (currentNode->key == key) {
+	    break;
+	}
+
+	if (key < currentNode->key) {
+	    currentNode = currentNode->left;
+	} else {
+	    currentNode = currentNode->right;
+	}
+    }
+    
+    // Delete it if we found it.
+    if (currentNode == NULL) {
+        retval = TREEMAP_ERROR;
+    } else {
+        retval = delete(treemap, currentNode);
+    }
+
+    // Unlock the mutex and exit.
+    if (treemap->mutex != NULL && (0 != pthread_mutex_unlock(treemap->mutex))) {
+        // We're hosed.
+        retval = TREEMAP_ERROR;
+    }
+
+    return retval;
+}
+
+
+/**
+ * Deletes a node from the treemap.
+ * @param treemap The treemap to delete from.
+ * @param node The node to delete.
+ * @return 0 on success, -1 on failure.
+ */
+static int delete(lpx_treemap_t *treemap, rbnode *node)
 {
     return TREEMAP_SUCCESS;
 }
