@@ -31,6 +31,7 @@
 #define COLOR_BLACK		4
 
 #include "mempool.h"
+#include "rwlock.h"
 
 /**
  * @brief A node in the red black tree.
@@ -48,7 +49,7 @@ typedef struct __rbnode {
  * @brief A type for the treemap.
  */
 typedef struct __lpx_treemap_t {
-    pthread_mutex_t *mutex;		/**< Mutex to protect the data structure. */
+    lpx_rwlock_t *rwlock;		/**< Mutex to protect the data structure. */
     lpx_mempool_variable_t *pool;       /**< The pool to allocate from. */
     rbnode *head;
 } lpx_treemap_t;

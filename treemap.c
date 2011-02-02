@@ -56,7 +56,7 @@ static int delete(lpx_treemap_t *treemap, rbnode *node);
 /**
  * @brief Initialize the treemap.
  * @param treemap The treemap to initialize.
- * @param isProtected Should a mutex be created for this treemap?
+ * @param isProtected Should a rwlock be created for this treemap?
  * @param pool The pool to use, null if there is none.
  * @return 0 on success, -1 on failure.
  */
@@ -68,19 +68,19 @@ static int init(lpx_treemap_t *treemap, int isProtected, lpx_mempool_variable_t 
 
     treemap->pool = pool;
 
-    // Set up the mutex if it is protected.
+    // Set up the reader writer lock if it is protected.
     if (isProtected == TREEMAP_PROTECTED) {
-        treemap->mutex = ALLOC(pool, sizeof(pthread_mutex_t));
-	if (treemap->mutex == NULL) {
+        treemap->rwlock = ALLOC(pool, sizeof(lpx_rwlock_t));
+	if (treemap->rwlock == NULL) {
 	    return TREEMAP_ERROR;
 	}
 
-        if (0 != pthread_mutex_init(treemap->mutex, NULL)) {
-	    FREE(treemap->pool, treemap->mutex);
+        if (0 != lpx_rwlock_init(treemap->rwlock)) {
+	    FREE(treemap->pool, treemap->rwlock);
 	    return TREEMAP_ERROR;
 	}
     } else {
-        treemap->mutex = NULL;
+        treemap->rwlock = NULL;
     }
 
     treemap->head = NULL;
@@ -476,16 +476,16 @@ int lpx_treemap_put(lpx_treemap_t *treemap, unsigned long key, unsigned long val
         return TREEMAP_ERROR;
     }
 
-    // Lock the mutex.
-    if (treemap->mutex != NULL && (0 != pthread_mutex_lock(treemap->mutex))) {
+    // Acquire a writer lock.
+    if (treemap->rwlock != NULL && (0 != lpx_rwlock_acquire_writer_lock(treemap->rwlock))) {
         return TREEMAP_ERROR;
     }
 
     // Now insert the value into the tree.
     retval = insert(treemap, key, value);
 
-    // Unlock the mutex and exit.
-    if (treemap->mutex != NULL && (0 != pthread_mutex_unlock(treemap->mutex))) {
+    // Unlock the rwlock and exit.
+    if (treemap->rwlock != NULL && (0 != lpx_rwlock_release_writer_lock(treemap->rwlock))) {
         // We're hosed.
         retval = TREEMAP_ERROR;
     }
@@ -505,6 +505,11 @@ int lpx_treemap_get(lpx_treemap_t *treemap, unsigned long key, unsigned long *va
     int retval = TREEMAP_ERROR;
 
     if (treemap == NULL || value == NULL) {
+        return TREEMAP_ERROR;
+    }
+
+    // Acquire a reader lock.
+    if (treemap->rwlock != NULL && (0 != lpx_rwlock_acquire_reader_lock(treemap->rwlock))) {
         return TREEMAP_ERROR;
     }
 
@@ -533,6 +538,12 @@ int lpx_treemap_get(lpx_treemap_t *treemap, unsigned long key, unsigned long *va
 	}
     }
 
+    // Release reader lock.
+    if (treemap->rwlock != NULL && (0 != lpx_rwlock_release_reader_lock(treemap->rwlock))) {
+        // We're hosed.
+        return TREEMAP_ERROR;
+    }
+
     return retval;
 }
 
@@ -550,14 +561,13 @@ int lpx_treemap_delete(lpx_treemap_t *treemap, unsigned long key)
         return TREEMAP_ERROR;
     }
 
-    rbnode *currentNode = treemap->head;
-
-    // Lock the mutex.
-    if (treemap->mutex != NULL && (0 != pthread_mutex_lock(treemap->mutex))) {
+    // Acquire a writer lock.
+    if (treemap->rwlock != NULL && (0 != lpx_rwlock_acquire_writer_lock(treemap->rwlock))) {
         return TREEMAP_ERROR;
     }
 
     // Find the node that we need to delete.
+    rbnode *currentNode = treemap->head;
     while (currentNode != NULL) {
         if (currentNode->key == key) {
 	    break;
@@ -577,8 +587,8 @@ int lpx_treemap_delete(lpx_treemap_t *treemap, unsigned long key)
         retval = delete(treemap, currentNode);
     }
 
-    // Unlock the mutex and exit.
-    if (treemap->mutex != NULL && (0 != pthread_mutex_unlock(treemap->mutex))) {
+    // Unlock the rwlock and exit.
+    if (treemap->rwlock != NULL && (0 != lpx_rwlock_release_writer_lock(treemap->rwlock))) {
         // We're hosed.
         retval = TREEMAP_ERROR;
     }
@@ -599,12 +609,19 @@ static int delete(lpx_treemap_t *treemap, rbnode *node)
 }
 
 /**
- * @brief  Destroy the treemap and release all resources.
+ * @brief  Destroy the treemap and release all resources. Threads calling get
+ *         or put while destroy is being called will cause indeterminate behavior.
  * @param  treemap The treemap to destroy.
  * @return 0 on success, -1 on failure.
  */
 int lpx_treemap_destroy(lpx_treemap_t *treemap)
 {
+    
+    // Acquire a writer lock.
+    if (treemap->rwlock != NULL && (0 != lpx_rwlock_acquire_writer_lock(treemap->rwlock))) {
+        return TREEMAP_ERROR;
+    }
+
     // Perform a post order traversal of the tree and free up resources
     // as you go.
     rbnode *currentNode = treemap->head;
@@ -637,8 +654,15 @@ int lpx_treemap_destroy(lpx_treemap_t *treemap)
 	currentNode = parentNode;
     }
 
-    if (treemap->mutex != NULL) {
-        FREE(treemap->pool, treemap->mutex);
+    // Unlock the rwlock.
+    if (treemap->rwlock != NULL) {
+        lpx_rwlock_release_writer_lock(treemap->rwlock);
+    }
+
+    // Finally get rid of the rwlock.
+    if (treemap->rwlock != NULL) {
+        lpx_rwlock_destroy(treemap->rwlock);
+        FREE(treemap->pool, treemap->rwlock);
     }
 
     return TREEMAP_SUCCESS;

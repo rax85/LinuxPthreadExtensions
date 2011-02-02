@@ -798,7 +798,6 @@ void testTreemapWorstCaseNoPools()
     lpx_treemap_t treemap;
     
     printf("=======================================\n");
-#if 0
     assert(0 == lpx_treemap_init(&treemap, TREEMAP_UNPROTECTED));
     treeTest1(&treemap);
     assert(0 == lpx_treemap_destroy(&treemap));
@@ -806,7 +805,7 @@ void testTreemapWorstCaseNoPools()
     assert(0 == lpx_treemap_init(&treemap, TREEMAP_UNPROTECTED));
     treeTest2(&treemap);
     assert(0 == lpx_treemap_destroy(&treemap));
-#endif
+    
     assert(0 == lpx_treemap_init(&treemap, TREEMAP_UNPROTECTED));
     treeTest3(&treemap);
     assert(0 == lpx_treemap_destroy(&treemap));

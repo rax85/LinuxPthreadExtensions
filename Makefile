@@ -38,7 +38,10 @@ mempool.o : mempool.c mempool.h
 pcQueue.o : pcQueue.c pcQueue.h sem.o mempool.o
 	$(CC) $(COPTS) -o pcQueue.o pcQueue.c
 
-treemap.o : treemap.c treemap.h sem.o mempool.o
+rwlock.o : rwlock.c rwlock.h
+	$(CC) $(COPTS) -o rwlock.o rwlock.c
+
+treemap.o : treemap.c treemap.h mempool.o rwlock.o
 	$(CC) $(COPTS) -o treemap.o treemap.c
 
 tcpserver.o : pcQueue.o threadpool.o mempool.o tcpserver.c tcpserver.h
