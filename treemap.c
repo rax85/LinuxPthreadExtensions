@@ -7,7 +7,7 @@
  *
  *         The implementation is non recursive... just because...
  *
- * @bug    Not tested for performance.
+ * @bug    Incomplete.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -47,11 +47,15 @@ static int insert(lpx_treemap_t *treemap, long key, long value);
 static void resolve_rb_conflics(lpx_treemap_t *treemap, rbnode *node);
 static inline rbnode *grandparent(rbnode *node);
 static inline rbnode *uncle(rbnode *node);
+static inline rbnode *sibling(rbnode *node);
 static inline int isLeftChild(rbnode *parent, rbnode *child);
 static inline int isRightChild(rbnode *parent, rbnode *child);
 static void rotateLeft(lpx_treemap_t *treemap, rbnode *node);
 static void rotateRight(lpx_treemap_t *treemap, rbnode *node);
 static int delete(lpx_treemap_t *treemap, rbnode *node);
+static rbnode *findReplacementCandidate(lpx_treemap_t *treemap, rbnode *node);
+static rbnode *deleteReplacementCandidate(lpx_treemap_t *treemap, rbnode *node, rbnode *candidate);
+static inline int hasRedChild(rbnode *node); 
 
 /**
  * @brief Initialize the treemap.
@@ -277,16 +281,29 @@ static inline int isRightChild(rbnode *parent, rbnode *child)
 static inline rbnode *uncle(rbnode *node)
 {
     rbnode *unode = NULL;
-    rbnode *gparent = grandparent(node);
-    if (gparent != NULL) {
-        if (isLeftChild(gparent, node->parent)) {
-	    unode = gparent->right;
+    if (node->parent != NULL) {
+        unode = sibling(node->parent);
+    }
+    return unode;
+}
+
+/**
+ * @brief  Get the other child of the given nodes parent.
+ * @param  node The node whose sibling is required.
+ * @return The sibling if it exists, NULL if not.
+ */
+static inline rbnode *sibling(rbnode *node)
+{
+    rbnode *sibling = NULL;
+    // Root nodes have no sibling.
+    if (node->parent != NULL) {
+	if (isLeftChild(node->parent, node)) {
+	    sibling = node->parent->right;
 	} else {
-	    unode = gparent->left;
+	    sibling = node->parent->left;
 	}
     }
-
-    return unode;
+    return sibling;
 }
 
 /**
@@ -566,7 +583,9 @@ int lpx_treemap_delete(lpx_treemap_t *treemap, unsigned long key)
         return TREEMAP_ERROR;
     }
 
-    // Find the node that we need to delete.
+    // Find the node that we need to delete. There cost of this delete is 2 log (n), one
+    // so that we find the node, and the other step to actually delete the node. Not too
+    // bad I guess.
     rbnode *currentNode = treemap->head;
     while (currentNode != NULL) {
         if (currentNode->key == key) {
@@ -596,6 +615,89 @@ int lpx_treemap_delete(lpx_treemap_t *treemap, unsigned long key)
     return retval;
 }
 
+/**
+ * @brief  Find the inorder predecessor or successor which we want to swap
+ *         values with and delete. We do this while also modifying the colors
+ *         of the nodes that we cross so that the replacement candidate is 
+ *         always a red node.
+ * @param  treemap The map to look in.
+ * @param  node The node to find a replacement for.
+ * @return A valid node if found, NULL if not.
+ */
+static rbnode *findReplacementCandidate(lpx_treemap_t *treemap, rbnode *node)
+{
+    rbnode *candidate = NULL;
+
+    // First, find the replacement candidate.
+    if (node->left != NULL) {
+        // Get the inorder predecessor.
+	candidate = node->left;
+	while(candidate->right != NULL) {
+	    candidate = candidate->right;
+	}
+    } else if (node->right != NULL) {
+        // Get the inorder successor.
+	candidate = node->right;
+	while (candidate->left != NULL) {
+	    candidate = candidate->left;
+	}
+    }
+
+    return candidate;
+}
+
+/**
+ * @brief Check if a node has atleast one red child.
+ * @param node The node to check.
+ * @return 1 if true, 0 if not.
+ */
+static inline int hasRedChild(rbnode *node) 
+{
+    if (isRed(node->right) || isRed(node->left)) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+/**
+ * @brief  Delete the replacement node for the node that we actually want to delete.
+ * @param  treemap The treemap we are operating on.
+ * @param  node The actual node to be deleted.
+ * @param  candidate The node that is being deleted instead.
+ * @return The node that needs to be freed.
+ */
+static rbnode *deleteReplacementCandidate(lpx_treemap_t *treemap, rbnode *node, rbnode *candidate)
+{
+
+    // Handle the simple cases.
+
+    if (isRed(candidate) && candidate->left == NULL && candidate->right == NULL) {
+        // Red leaves can be simply deleted.
+	if (isLeftChild(candidate->parent, candidate)) {
+	    candidate->parent->left = NULL;
+	} else {
+	    candidate->parent->right = NULL;
+	}
+	return candidate;
+    }
+
+    if (isBlack(candidate) && hasRedChild(candidate)) {
+        // The child must be red or else the tree is not a valid red black tree.
+        rbnode *child = (candidate->left != NULL) ? candidate->left : candidate->right;
+	candidate->key = child->key;
+	candidate->value = child->value;
+	candidate->left = NULL;
+	candidate->right = NULL;
+	return child;
+    }
+
+    // Right now the candidate is black and has no children. No other possibilities exist.
+    
+
+
+    return candidate;
+}
 
 /**
  * Deletes a node from the treemap.
@@ -605,6 +707,38 @@ int lpx_treemap_delete(lpx_treemap_t *treemap, unsigned long key)
  */
 static int delete(lpx_treemap_t *treemap, rbnode *node)
 {
+    long key = 0;
+    long value = 0;
+
+    rbnode *candidate = findReplacementCandidate(treemap, node);
+    if (candidate == NULL) {
+        // The node that we want to delete is a leaf node. We dont need
+	// to copy anything in.
+	candidate = node;
+    } else {
+        // We have a replacement candidate to delete. Copy the value
+	// of the replacement into the node that we want to delete.
+	key = candidate->key;
+	value = candidate->value;
+    }
+
+    candidate = deleteReplacementCandidate(treemap, node, candidate);
+
+    // Finally free the candidate. If we had deleted a replacement candidate, we copy the
+    // data of the replacement into the node that should have been deleted.
+    FREE(treemap->pool, candidate);
+    if (node != candidate) {
+        node->key = key;
+	node->value = value;
+    }
+
+    // Set the head to NULL if we just blew it away, otherwise set it to black.
+    if (treemap->head == candidate) {
+        treemap->head = NULL;
+    } else {
+        treemap->head->color = COLOR_BLACK;
+    }
+
     return TREEMAP_SUCCESS;
 }
 
