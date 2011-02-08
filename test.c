@@ -863,7 +863,7 @@ void testTreemapWorstCaseWithPools()
     lpx_treemap_t treemap;
     lpx_mempool_variable_t pool;
     printf("=======================================\n");
-    assert(0 == lpx_mempool_create_variable_pool(&pool, 4096, MEMPOOL_UNPROTECTED));
+    assert(0 == lpx_mempool_create_variable_pool(&pool, 1024 * 1024, MEMPOOL_UNPROTECTED));
     
     assert(0 == lpx_treemap_init_from_pool(&treemap, TREEMAP_UNPROTECTED, &pool));
     treeTest1(&treemap);

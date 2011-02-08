@@ -633,7 +633,7 @@ static rbnode *findReplacementCandidate(lpx_treemap_t *treemap, rbnode *node)
 	candidate = pnode;
     } else if ((snode = successor(treemap, node)) != NULL) {
         // Get the inorder successor.
-	candidate = node->right;
+	candidate = snode;
     }
 
     return candidate;
@@ -667,6 +667,13 @@ static rbnode *predecessor(lpx_treemap_t *treemap, rbnode *node)
 static rbnode *successor(lpx_treemap_t *treemap, rbnode *node)
 {
     rbnode *successor = NULL;
+    if (node->right != NULL) {
+        successor = node->right;
+	while(successor->left != NULL) {
+	    successor = successor->left;
+	}
+    }
+
     return successor;
 }
 
