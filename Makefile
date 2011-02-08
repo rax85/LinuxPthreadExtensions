@@ -7,7 +7,7 @@
 CC=gcc
 COVOPTS=-fprofile-arcs -ftest-coverage
 PROFOPTS=-pg
-COPTS=-g -O2 -Wall -fpic -c $(COVOPTS) $(PROFOPTS)
+COPTS=-g -O0 -Wall -fpic -c $(COVOPTS) $(PROFOPTS)
 AR=ar
 AROPTS=rcs
 

@@ -27,8 +27,8 @@
 #define TREEMAP_PROTECTED	1
 #define TREEMAP_UNPROTECTED	2
 
-#define COLOR_RED		3
-#define COLOR_BLACK		4
+#define COLOR_RED		((int)'r')
+#define COLOR_BLACK		((int)'b')
 
 #include "mempool.h"
 #include "rwlock.h"
@@ -65,5 +65,7 @@ int lpx_treemap_get(lpx_treemap_t *treemap, unsigned long key, unsigned long *va
 int lpx_treemap_delete(lpx_treemap_t *treemap, unsigned long key);
 
 int lpx_treemap_destroy(lpx_treemap_t *treemap);
+
+int lpx_treemap_check_rb_conflicts(lpx_treemap_t *treemap);
 
 #endif

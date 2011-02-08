@@ -720,6 +720,7 @@ void treeTest1(lpx_treemap_t *treemap)
     for (i = lb; i < ub; i++) {
         printf ("1: Inserting %ld\n", i);
         assert(0 == lpx_treemap_put(treemap, i, i * 1000));
+	assert(0 == lpx_treemap_check_rb_conflicts(treemap));
        	for (j = lb; j <= i; j++) {
 	    assert(0 == lpx_treemap_get(treemap, j, &v));
 	    assert(v == (j * 1000));
@@ -743,6 +744,7 @@ void treeTest2(lpx_treemap_t *treemap)
     for (i = ub - 1; i >= lb; i--) {
         printf ("2: Inserting %ld\n", i);
         assert(0 == lpx_treemap_put(treemap, i, i * 1000));
+	assert(0 == lpx_treemap_check_rb_conflicts(treemap));
 	for (j = ub - 1; j >= i; j--) {
 	    assert(0 == lpx_treemap_get(treemap, j, &v));
 	    assert(v == (j * 1000));
@@ -767,6 +769,7 @@ void treeTest3(lpx_treemap_t *treemap)
     for (i = 0; i < interval; i++) {
         printf("3: Inserting %ld\n", lb + i);
 	assert(0 == lpx_treemap_put(treemap, lb + i, (lb + i) * 1000));
+	assert(0 == lpx_treemap_check_rb_conflicts(treemap));
 	for (j = lb; j <= lb + i; j++) {
 	    assert(0 == lpx_treemap_get(treemap, j, &v));
 	    assert(v == (j * 1000));
@@ -774,6 +777,7 @@ void treeTest3(lpx_treemap_t *treemap)
 
 	printf("3: Inserting %ld\n", ub - i);
 	assert(0 == lpx_treemap_put(treemap, ub - i, (ub - i) * 1000));
+	assert(0 == lpx_treemap_check_rb_conflicts(treemap));
 	for (j = ub; j >= ub - i; j--) {
 	    assert(0 == lpx_treemap_get(treemap, j, &v));
 	    assert(v == (j * 1000));
@@ -782,11 +786,39 @@ void treeTest3(lpx_treemap_t *treemap)
 }
 
 /**
- * @brief Steadily increasing right subtree of a left child.
+ * @brief Check whether delete works.
  * @param treemap The treemap to test.
  */
 void treeTest4(lpx_treemap_t *treemap)
 {
+    long i = 0;
+    long j = 0;
+    long v = 0;
+    long lb = 1;
+    long ub = 1001;
+
+    for (i = lb; i < ub; i++) {
+        assert(0 == lpx_treemap_put(treemap, i, i * 1000));
+	assert(0 == lpx_treemap_check_rb_conflicts(treemap));
+       	for (j = lb; j <= i; j++) {
+	    assert(0 == lpx_treemap_get(treemap, j, &v));
+	    assert(v == (j * 1000));
+	}
+    }
+
+    // Delete the value, make sure its gone.
+    for (i = lb; i < ub; i++) {
+        printf("Deleting %ld\n", i); 
+        assert(0 == lpx_treemap_delete(treemap, i));
+	assert(0 == lpx_treemap_check_rb_conflicts(treemap));
+	// Make sure the one we deleted isnt there.
+	assert(0 != lpx_treemap_get(treemap, i, &v));
+	// Make sure everything else is there.
+	for (j = i + 1; j < ub; j++) {
+	    assert(0 == lpx_treemap_get(treemap, j, &v));
+	    assert(v == j * 1000);
+	}
+    }
 }
 
 /**
@@ -809,7 +841,7 @@ void testTreemapWorstCaseNoPools()
     assert(0 == lpx_treemap_init(&treemap, TREEMAP_UNPROTECTED));
     treeTest3(&treemap);
     assert(0 == lpx_treemap_destroy(&treemap));
-
+    
     assert(0 == lpx_treemap_init(&treemap, TREEMAP_UNPROTECTED));
     treeTest4(&treemap);
     assert(0 == lpx_treemap_destroy(&treemap));

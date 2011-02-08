@@ -3,11 +3,13 @@
  * @author Rakesh Iyer
  * @brief  An implementation of a map based on a red black tree. For an
  *         explanation of how this worked go to:
- *         http://en.wikipedia.org/wiki/Red-black_tree
+ *         [1] http://en.wikipedia.org/wiki/Red-black_tree
+ *         [2] http://www.ece.uc.edu/~franco/C321/html/RedBlack/redblack.html
  *
  *         The implementation is non recursive... just because...
+ *         The assertion routine is recursive though. Because I was lazy :)
  *
- * @bug    Incomplete.
+ * @bug    Still needs a lot of testing. Mostly works though.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -24,6 +26,7 @@
  */
 
 #include "treemap.h"
+#include <stdio.h>
 
 /**
  * @def ALLOC
@@ -56,6 +59,9 @@ static int delete(lpx_treemap_t *treemap, rbnode *node);
 static rbnode *findReplacementCandidate(lpx_treemap_t *treemap, rbnode *node);
 static rbnode *deleteReplacementCandidate(lpx_treemap_t *treemap, rbnode *node, rbnode *candidate);
 static inline int hasRedChild(rbnode *node); 
+static int assert_rb_valid(lpx_treemap_t *treemap, rbnode *node, int blackCount, int *maxBlackCount);
+static rbnode *predecessor(lpx_treemap_t *treemap, rbnode *node);
+static rbnode *successor(lpx_treemap_t *treemap, rbnode *node);
 
 /**
  * @brief Initialize the treemap.
@@ -534,23 +540,14 @@ int lpx_treemap_get(lpx_treemap_t *treemap, unsigned long key, unsigned long *va
 
     while (currentNode != NULL) {
         if (currentNode->key == key) {
-#if PRINT_PATH
-            printf("F\n");
-#endif
 	    *value = currentNode->value;
 	    retval = TREEMAP_SUCCESS;
 	    break;
 	}
 
 	if (key < currentNode->key) {
-#if PRINT_PATH
-            printf("L ");
-#endif
 	    currentNode = currentNode->left;
 	} else {
-#if PRINT_PATH
-            printf("R ");
-#endif
 	    currentNode = currentNode->right;
 	}
     }
@@ -627,23 +624,50 @@ int lpx_treemap_delete(lpx_treemap_t *treemap, unsigned long key)
 static rbnode *findReplacementCandidate(lpx_treemap_t *treemap, rbnode *node)
 {
     rbnode *candidate = NULL;
+    rbnode *pnode = NULL;
+    rbnode *snode = NULL;
 
     // First, find the replacement candidate.
-    if (node->left != NULL) {
+    if ((pnode = predecessor(treemap, node)) != NULL) {
         // Get the inorder predecessor.
-	candidate = node->left;
-	while(candidate->right != NULL) {
-	    candidate = candidate->right;
-	}
-    } else if (node->right != NULL) {
+	candidate = pnode;
+    } else if ((snode = successor(treemap, node)) != NULL) {
         // Get the inorder successor.
 	candidate = node->right;
-	while (candidate->left != NULL) {
-	    candidate = candidate->left;
-	}
     }
 
     return candidate;
+}
+
+/**
+ * @brief  Get the inorder predecessor of the given node.
+ * @param  treemap The treemap to operate on.
+ * @param  node The node whose predecessor is requested.
+ * @return The precedecessor if it exists, NULL if not.
+ */
+static rbnode *predecessor(lpx_treemap_t *treemap, rbnode *node)
+{
+    rbnode *predecessor = NULL;
+    if (node->left != NULL) {
+        predecessor = node->left;
+	while(predecessor->right != NULL) {
+	    predecessor = predecessor->right;
+	}
+    }
+
+    return predecessor;
+}
+
+/**
+ * @brief  Get the inorder predecessor of the given node.
+ * @param  treemap The treemap to operate on.
+ * @param  node The node whose predecessor is requested.
+ * @return The precedecessor if it exists, NULL if not.
+ */
+static rbnode *successor(lpx_treemap_t *treemap, rbnode *node)
+{
+    rbnode *successor = NULL;
+    return successor;
 }
 
 /**
@@ -658,6 +682,28 @@ static inline int hasRedChild(rbnode *node)
     } else {
         return 0;
     }
+}
+
+/**
+ * @brief  Get the far nephew of a node.
+ * @param  The node to check.
+ * @return The far nephew if it exists, NULL otherwise.
+ */
+static inline rbnode *farnephew(rbnode *node)
+{
+    rbnode *parent = node->parent;
+    rbnode *siblingNode = sibling(node);
+    rbnode *farNephew = NULL;
+    
+    if (siblingNode != NULL) {
+        if (isRightChild(parent, siblingNode)) {
+            farNephew = siblingNode->right;
+        } else {
+            farNephew = siblingNode->left;
+        }
+    }
+
+    return farNephew;
 }
 
 /**
@@ -693,8 +739,73 @@ static rbnode *deleteReplacementCandidate(lpx_treemap_t *treemap, rbnode *node, 
     }
 
     // Right now the candidate is black and has no children. No other possibilities exist.
-    
+    rbnode *current = candidate;
+    while(current->parent != NULL) {
+        rbnode *parent = current->parent;
+        rbnode *siblingNode = sibling(current);
+	if (isRed(siblingNode)) {
+	    // Make the sibling black, the parent red and rotate around the parent node.
+	    // 5.1.1 Exchange the parent and sibling colors.
+	    siblingNode->color = COLOR_BLACK;
+	    parent->color = COLOR_RED;
+	    // 5.1.2 Rotate the sibling into the place of the parent.
+	    if (isLeftChild(parent, current)) {
+	        rotateLeft(treemap, parent);
+	    } else {
+	        rotateRight(treemap, parent);
+	    }
 
+	    continue;
+	}
+
+	// We know for sure that candidates sibling is black.
+	// Sibling is black with 2 black children.
+	if (isBlack(siblingNode->left) && isBlack(siblingNode->right)) {
+	    // 5.2.1 Make the sibling red.
+	    siblingNode->color = COLOR_RED;
+	    // Make the parent the current node. If the current is black, there is a black imbalance so continue.
+	    current = parent;
+	    if (parent->color == COLOR_BLACK) {
+	        continue;
+	    }
+
+	    // 5.2.2 The current is red, make it black. There are no more conflicts so terminate.
+	    current->color = COLOR_BLACK;
+	    break;
+	}
+	
+	// Sibling is black with one or more red children
+	if (isRed(siblingNode->left) || isRed(siblingNode->right)) {
+	    rbnode *farNephew = farnephew(current);
+	    
+	    if (isBlack(farNephew)) {
+	        // 5.3.1 If the far nephew is black, rotate in that direction around the sibling.
+	        if (isLeftChild(siblingNode, farNephew)) {
+	            rotateLeft(treemap, siblingNode);
+	        } else {
+	            rotateRight(treemap, siblingNode);
+	        }
+	    }
+
+	    // 5.3.2 Set the far nephew to black, the sibling to the color of the parent and the parent to black.
+	    siblingNode = sibling(current);
+	    farNephew = farnephew(current);
+	    farNephew->color = COLOR_BLACK;
+	    siblingNode->color = siblingNode->parent->color;
+	    current->parent->color = COLOR_BLACK;
+
+	    // 5.3.3 Rotate around the parent in the direction of current. If a predecessor or successor
+	    //       exists, that becomes the new candidate node.
+	    if (isLeftChild(current->parent, current)) {
+	        rotateLeft(treemap, current->parent);
+	    } else {
+	        rotateRight(treemap, current->parent);
+	    }
+
+            // TODO: Why was this there? - If a predecessor or successor exits to current, make that the new candidate node.
+	    break;
+	}
+    }
 
     return candidate;
 }
@@ -715,17 +826,19 @@ static int delete(lpx_treemap_t *treemap, rbnode *node)
         // The node that we want to delete is a leaf node. We dont need
 	// to copy anything in.
 	candidate = node;
-    } else {
+    }
+
+    candidate = deleteReplacementCandidate(treemap, node, candidate);
+    if (candidate != node) {
         // We have a replacement candidate to delete. Copy the value
 	// of the replacement into the node that we want to delete.
 	key = candidate->key;
 	value = candidate->value;
     }
 
-    candidate = deleteReplacementCandidate(treemap, node, candidate);
-
     // Finally free the candidate. If we had deleted a replacement candidate, we copy the
     // data of the replacement into the node that should have been deleted.
+    rbnode *parent = candidate->parent;
     FREE(treemap->pool, candidate);
     if (node != candidate) {
         node->key = key;
@@ -736,6 +849,13 @@ static int delete(lpx_treemap_t *treemap, rbnode *node)
     if (treemap->head == candidate) {
         treemap->head = NULL;
     } else {
+        // Unlink the candidate node that we want to delete.
+        if (isLeftChild(parent, candidate)) {
+	    parent->left = NULL;
+	} else {
+	    parent->right = NULL;
+	}
+
         treemap->head->color = COLOR_BLACK;
     }
 
@@ -800,5 +920,69 @@ int lpx_treemap_destroy(lpx_treemap_t *treemap)
     }
 
     return TREEMAP_SUCCESS;
+}
+
+/**
+ * @brief  Check if the given subtree is a valid red black tree.
+ * @param  treemap The treemap to check.
+ * @param  node The node that represents the root of the subtree that needs to be checked.
+ * @param  blackCount The black count at this level.
+ * @param  maxBlackCount The maximum black depth at this node.
+ * @return 0 if its a valid rb tree, -1 if not.
+ */
+static int assert_rb_valid(lpx_treemap_t *treemap, rbnode *node, int blackCount, int *maxBlackCount)
+{
+    int retval = 0;
+
+    // A red node must have 2 black children.
+    if (isRed(node)) {
+        if (!isBlack(node->left) || !isBlack(node->right)) {
+	    printf("!! Red node has non red child !!\n");
+            return TREEMAP_ERROR;
+        }
+    } else {
+        // Increase the black count.
+	blackCount++;
+    }
+
+    if (node->left == NULL && node->right == NULL) {
+	// Black depth must be equal for all leaf nodes.
+	if (*maxBlackCount == -1) {
+	    *maxBlackCount = blackCount;
+	} else {
+	    if (*maxBlackCount != blackCount) {
+	        printf("!! Black count violation Expected %d, got %d !!\n", *maxBlackCount, blackCount);
+	        return TREEMAP_ERROR;
+	    }
+	}
+    }
+
+    // Verify the left subtree.
+    if (node->left != NULL) {
+        retval |= assert_rb_valid(treemap, node->left, blackCount, maxBlackCount);
+    }
+
+    // Verify the right subtree.
+    if (node->right != NULL) {
+        retval |= assert_rb_valid(treemap, node->right, blackCount, maxBlackCount);
+    }
+
+    return retval;
+}
+
+/**
+ * @brief  Check whether the treemap is a valid rb tree.
+ * @param  treemap The treemap to check for conflicts.
+ * @return 0 if no conflicts are found, -1 otherwise
+ */
+int lpx_treemap_check_rb_conflicts(lpx_treemap_t *treemap)
+{
+    int maxBlackCount = -1;
+
+    if (treemap->head != NULL) {
+        return assert_rb_valid(treemap, treemap->head, 0, &maxBlackCount);
+    } else {
+        return TREEMAP_SUCCESS;
+    }
 }
 
