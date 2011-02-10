@@ -21,11 +21,18 @@
 #ifndef __RWLOCK_H__
 #define __RWLOCK_H__
 
+#include <pthread.h>
+#include <string.h>
+#include <errno.h>
+
 #define RWLOCK_SUCCESS		0
 #define RWLOCK_ERROR		-1
+#define RWLOCK_TIMEOUT		-2
 
 typedef struct __lpx_rwlock_t {
-    int readers;
+    int value;
+    pthread_mutex_t rwlock_mutex;
+    pthread_cond_t  rwlock_cvar;
 } lpx_rwlock_t;
     
 

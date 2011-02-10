@@ -252,6 +252,7 @@ int lpx_sem_timed_down(lpx_semaphore_t *sem, int value, long timeoutMillis)
     // such that it holds the remaining time.
     timeoutMillis -= timespecDiffMillis(after, before);
     if (timeoutMillis < 0) {
+        pthread_mutex_unlock(&sem->sem_mutex);
         return SEMAPHORE_TIMEOUT;
     }
 
