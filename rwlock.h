@@ -25,14 +25,31 @@
 #include <string.h>
 #include <errno.h>
 
+/**
+ * @def   RWLOCK_SUCCESS
+ * @brief The operation succeeded.
+ */
 #define RWLOCK_SUCCESS		0
+
+/**
+ * @def   RWLOCK_ERROR
+ * @brief The operation failed.
+ */
 #define RWLOCK_ERROR		-1
+
+/**
+ * @def   RWLOCK_TIMEOUT
+ * @brief The operation failed due to a timeout.
+ */
 #define RWLOCK_TIMEOUT		-2
 
+/**
+ * @brief
+ */
 typedef struct __lpx_rwlock_t {
-    int value;
-    pthread_mutex_t rwlock_mutex;
-    pthread_cond_t  rwlock_cvar;
+    int value;                      /**< Keeps track of the readers and writers. */
+    pthread_mutex_t rwlock_mutex;   /**< The mutex part of the reader writer lock. */
+    pthread_cond_t  rwlock_cvar;    /**< The condition variable part of the reader writer lock. */
 } lpx_rwlock_t;
     
 

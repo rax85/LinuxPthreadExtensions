@@ -21,28 +21,55 @@
 #ifndef __TREEMAP_H__
 #define __TREEMAP_H__
 
-#define TREEMAP_SUCCESS		0
-#define TREEMAP_ERROR		-1
-
-#define TREEMAP_PROTECTED	1
-#define TREEMAP_UNPROTECTED	2
-
-#define COLOR_RED		((int)'r')
-#define COLOR_BLACK		((int)'b')
-
 #include "mempool.h"
 #include "rwlock.h"
+
+/**
+ * @def   TREEMAP_SUCCESS
+ * @brief Represents a success.
+ */
+#define TREEMAP_SUCCESS		0
+
+/**
+ * @def   TREEMAP_ERROR
+ * @brief Represents a failure.
+ */
+#define TREEMAP_ERROR		-1
+
+/**
+ * @def   TREEMAP_PROTECTED
+ * @brief Represents a treemap protected with a reader writer lock.
+ */
+#define TREEMAP_PROTECTED	1
+
+/**
+ * @def   TREEMAP_UNPROTECTED
+ * @brief Represents a treemap that does not use any synchronization.
+ */
+#define TREEMAP_UNPROTECTED	2
+
+/**
+ * @def   COLOR_RED
+ * @brief Node is red (in red black tree terminology).
+ */
+#define COLOR_RED		((int)'r')
+
+/**
+ * @def   COLOR_BLACK
+ * @brief Node is black (in red black tree terminology).
+ */
+#define COLOR_BLACK		((int)'b')
 
 /**
  * @brief A node in the red black tree.
  */
 typedef struct __rbnode {
-    char color;
-    struct __rbnode *parent;
-    struct __rbnode *left;
-    struct __rbnode *right;
-    long key;
-    long value;
+    char color;               /**< Is this node red or black? */
+    struct __rbnode *parent;  /**< Pointer to the parent.*/
+    struct __rbnode *left;    /**< Pointer to the left child. */
+    struct __rbnode *right;   /**< Pointer to the right child. */
+    long key;                 /**< The key that this node represents. */
+    long value;               /**< The value correpsonding to the key. */
 }rbnode;
 
 /**
@@ -51,7 +78,7 @@ typedef struct __rbnode {
 typedef struct __lpx_treemap_t {
     lpx_rwlock_t *rwlock;		/**< Mutex to protect the data structure. */
     lpx_mempool_variable_t *pool;       /**< The pool to allocate from. */
-    rbnode *head;
+    rbnode *head;                       /**< Pointer to the root node of the tree. */
 } lpx_treemap_t;
 
 int lpx_treemap_init(lpx_treemap_t *treemap, int isProtected);

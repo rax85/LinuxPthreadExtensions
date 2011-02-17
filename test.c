@@ -9,6 +9,7 @@
 #include "mempool.h"
 #include "pcQueue.h"
 #include "treemap.h"
+#include "arraylist.h"
 #include <assert.h>
 
 
@@ -855,11 +856,6 @@ void testTreemapWorstCaseNoPools()
  */
 void testTreemapWorstCaseWithPools()
 {
-    long i = 0;
-    long j = 0;
-    long v = 0;
-    long lb = 1;
-    long ub = 100;
     lpx_treemap_t treemap;
     lpx_mempool_variable_t pool;
     printf("=======================================\n");
@@ -883,6 +879,205 @@ void testTreemapWorstCaseWithPools()
 
     assert(0 == lpx_mempool_destroy_variable_pool(&pool));
     printf("Test testTreemapWorstCaseWithPools passed.\n");
+}
+
+// ------------------------------- Test the arraylist ----------------------------
+
+/**
+ * @brief
+ */
+void listInsertTest(lpx_arraylist_t *list)
+{
+    int ub = 5000;
+    long i = 0;
+    long j = 0;
+    long value = 0;
+
+    // Test append.
+    for (i = 0; i < ub; i++) {
+        if (i % 1000 == 0) {
+	    printf("Inserting %ld\n", i);
+	}
+        assert(0 == lpx_arraylist_append(list, i * 1000));
+
+	for (j = 0; j <= i; j++) {
+	    assert(0 == lpx_arraylist_get(list, j, &value));
+	    assert(j * 1000 == value);
+	}
+    }
+
+    // Test set.
+    for (i = 0; i < ub; i++) {
+        assert(0 == lpx_arraylist_set(list, i, i * 100));
+	assert(0 == lpx_arraylist_get(list, i, &value));
+	assert(value == i * 100);
+    }
+
+    printf(" - listInsertTest passed\n");
+}
+
+/**
+ * @brief
+ */
+void listRemoveTest(lpx_arraylist_t *list)
+{
+    int ub = 5000;
+    long i = 0;
+    long j = 0;
+    long value = 0;
+
+    for (i = 0; i < ub; i++) {
+        assert(0 == lpx_arraylist_append(list, i * 1000));
+	assert(0 == lpx_arraylist_get(list, i, &value));
+	assert(i * 1000 == value);
+    }
+
+    printf(" - listInsertTest passed\n");
+    return;
+}
+
+/**
+ * @brief
+ */
+void clearListTest(lpx_arraylist_t *list)
+{
+    int ub = 5000;
+    long i = 0;
+    long j = 0;
+    long value = 0;
+
+    for (i = 0; i < ub; i++) {
+        assert(0 == lpx_arraylist_append(list, i * 1000));
+	assert(0 == lpx_arraylist_get(list, i, &value));
+	assert(i * 1000 == value);
+        assert((i + 1) == lpx_arraylist_size(list));
+    }
+
+    assert(0 == lpx_arraylist_clear(list));
+    assert(0 == lpx_arraylist_size(list));
+
+    printf(" - listInsertTest passed\n");
+    return;
+}
+
+/**
+ * @brief Test whether translating from a list to array.
+ */
+void listToArrayTest(lpx_arraylist_t *list)
+{
+    int ub = 5000;
+    long i = 0;
+    long j = 0;
+    long value = 0;
+    long *array = NULL;
+
+    for (i = 0; i < ub; i++) {
+        assert(0 == lpx_arraylist_append(list, i * 1000));
+	assert(0 == lpx_arraylist_get(list, i, &value));
+	assert(i * 1000 == value);
+    }
+
+    array = lpx_arraylist_to_array(list);
+    assert(NULL != array);
+    for (i = 0; i < ub; i++) {
+        assert(array[i] == i * 1000);
+    }
+
+    if (list->pool == NULL) {
+        free(array);
+    }
+
+    printf(" - listToArrayTest passed\n");
+    return;
+}
+
+/**
+ * @brief Test whether get index works.
+ */
+void getIndexTest(lpx_arraylist_t *list)
+{
+    int ub = 5000;
+    long i = 0;
+    long j = 0;
+    long value = 0;
+
+    for (i = 0; i < ub; i++) {
+        assert(0 == lpx_arraylist_append(list, i * 1000));
+	assert(0 == lpx_arraylist_get(list, i, &value));
+	assert(i * 1000 == value);
+	
+	for(j = 0; j <= i; j++) {
+	    assert(j == lpx_arraylist_get_index(list, j * 1000));
+	}
+    }
+
+    printf(" - getIndexTest passed\n");
+    return;
+}
+
+/**
+ * @brief Run the battery of arraylist tests using memory pools.
+ */
+void testArraylistPools()
+{
+    lpx_arraylist_t list;
+    lpx_mempool_variable_t pool;
+    printf("=======================================\n");
+    assert(0 == lpx_mempool_create_variable_pool(&pool, 1024 * 1024, MEMPOOL_UNPROTECTED));
+    
+    assert(0 == lpx_arraylist_init_from_pool(&list, ARRAYLIST_PROTECTED, &pool));
+    listInsertTest(&list);
+    assert(0 == lpx_arraylist_destroy(&list));
+    
+    assert(0 == lpx_arraylist_init_from_pool(&list, ARRAYLIST_PROTECTED, &pool));
+    listRemoveTest(&list);
+    assert(0 == lpx_arraylist_destroy(&list));
+    
+    assert(0 == lpx_arraylist_init_from_pool(&list, ARRAYLIST_PROTECTED, &pool));
+    clearListTest(&list);
+    assert(0 == lpx_arraylist_destroy(&list));
+    
+    assert(0 == lpx_arraylist_init_from_pool(&list, ARRAYLIST_PROTECTED, &pool));
+    listToArrayTest(&list);
+    assert(0 == lpx_arraylist_destroy(&list));
+    
+    assert(0 == lpx_arraylist_init_from_pool(&list, ARRAYLIST_PROTECTED, &pool));
+    getIndexTest(&list);
+    assert(0 == lpx_arraylist_destroy(&list));
+    
+    assert(0 == lpx_mempool_destroy_variable_pool(&pool));
+    printf("Test testArraylistPools passed.\n");
+}
+
+/**
+ * @brief Run the battery of arraylist test without using memory pools.
+ */
+void testArraylistNoPools()
+{
+    lpx_arraylist_t list;
+    printf("=======================================\n");
+
+    assert(0 == lpx_arraylist_init(&list, ARRAYLIST_PROTECTED));
+    listInsertTest(&list);
+    assert(0 == lpx_arraylist_destroy(&list));
+    
+    assert(0 == lpx_arraylist_init(&list, ARRAYLIST_PROTECTED));
+    listRemoveTest(&list);
+    assert(0 == lpx_arraylist_destroy(&list));
+    
+    assert(0 == lpx_arraylist_init(&list, ARRAYLIST_PROTECTED));
+    clearListTest(&list);
+    assert(0 == lpx_arraylist_destroy(&list));
+    
+    assert(0 == lpx_arraylist_init(&list, ARRAYLIST_PROTECTED));
+    listToArrayTest(&list);
+    assert(0 == lpx_arraylist_destroy(&list));
+    
+    assert(0 == lpx_arraylist_init(&list, ARRAYLIST_PROTECTED));
+    getIndexTest(&list);
+    assert(0 == lpx_arraylist_destroy(&list));
+    
+    printf("Test testArraylistNoPools passed.\n");
 }
 
 
@@ -914,6 +1109,8 @@ int main(int argc, char **argv)
     testTimedPcq1();
     testTreemapWorstCaseWithPools();
     testTreemapWorstCaseNoPools();
+    testArraylistNoPools();
+    testArraylistPools(); 
     return 0;
 }
 

@@ -24,7 +24,7 @@ libpthreadext.a : pthreadExtObjs
 libpthreadext.so.1.0.1 : pthreadExtObjs
 	$(CC) -shared -Wl,-soname,libpthreadext.so.1 -o libpthreadext.so.1.0.1 *.o -lc
 
-pthreadExtObjs : sem.o threadpool.o mempool.o pcQueue.o tcpserver.o treemap.o
+pthreadExtObjs : sem.o threadpool.o mempool.o pcQueue.o tcpserver.o treemap.o arraylist.o
 
 threadpool.o : threadPool.c threadPool.h sem.o
 	$(CC) $(COPTS) -o threadpool.o threadPool.c
@@ -38,11 +38,14 @@ mempool.o : mempool.c mempool.h
 pcQueue.o : pcQueue.c pcQueue.h sem.o mempool.o
 	$(CC) $(COPTS) -o pcQueue.o pcQueue.c
 
-rwlock.o : rwlock.c rwlock.h
+rwlock.o : rwlock.c rwlock.h sem.o
 	$(CC) $(COPTS) -o rwlock.o rwlock.c
 
 treemap.o : treemap.c treemap.h mempool.o rwlock.o
 	$(CC) $(COPTS) -o treemap.o treemap.c
+
+arraylist.o : arraylist.c arraylist.h mempool.o rwlock.o
+	$(CC) $(COPTS) -o arraylist.o arraylist.c 
 
 tcpserver.o : pcQueue.o threadpool.o mempool.o tcpserver.c tcpserver.h
 	$(CC) $(COPTS) -o tcpserver.o tcpserver.c
