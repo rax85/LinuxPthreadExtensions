@@ -46,6 +46,12 @@ II. This is a list of currently available and planned functionality:
          implemented and minimally tested. The timed enqueue and dequeue probably need some work
          to be more accurate about timeouts.
 
+    5. Reader Writer Locks
+
+    6. Treemap
+
+    7. Arraylist
+
 III. Building.
     - 'make' builds the library.
     - The default build has debug symbols on. You might want to switch that off before
