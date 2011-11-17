@@ -79,6 +79,7 @@ typedef struct __lpx_treemap_t {
     lpx_rwlock_t *rwlock;		/**< Mutex to protect the data structure. */
     lpx_mempool_variable_t *pool;       /**< The pool to allocate from. */
     rbnode *head;                       /**< Pointer to the root node of the tree. */
+    int (*comparator)(unsigned long, unsigned long); /**< An optional comparator. */
 } lpx_treemap_t;
 
 int lpx_treemap_init(lpx_treemap_t *treemap, int isProtected);
@@ -94,5 +95,8 @@ int lpx_treemap_delete(lpx_treemap_t *treemap, unsigned long key);
 int lpx_treemap_destroy(lpx_treemap_t *treemap);
 
 int lpx_treemap_check_rb_conflicts(lpx_treemap_t *treemap);
+
+int lpx_treemap_override_comparator(lpx_treemap_t *treemap, \
+                                    int (*comparator)(unsigned long, unsigned long));
 
 #endif

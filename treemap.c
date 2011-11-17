@@ -62,6 +62,7 @@ static inline int hasRedChild(rbnode *node);
 static int assert_rb_valid(lpx_treemap_t *treemap, rbnode *node, int blackCount, int *maxBlackCount);
 static rbnode *predecessor(lpx_treemap_t *treemap, rbnode *node);
 static rbnode *successor(lpx_treemap_t *treemap, rbnode *node);
+static int default_comparator(unsigned long v1, unsigned long v2);
 
 /**
  * @brief Initialize the treemap.
@@ -94,6 +95,7 @@ static int init(lpx_treemap_t *treemap, int isProtected, lpx_mempool_variable_t 
     }
 
     treemap->head = NULL;
+    treemap->comparator = default_comparator;
 
     return TREEMAP_SUCCESS;
 }
@@ -177,6 +179,8 @@ static inline int isBlack(rbnode *node)
  */
 static int insert(lpx_treemap_t *treemap, long key, long value)
 {
+    int comp = 0;
+
     // First of all, get a node.
     rbnode *node = newNode(treemap, key, value);
     if (node == NULL) {
@@ -195,8 +199,10 @@ static int insert(lpx_treemap_t *treemap, long key, long value)
     // Ok we have to actually insert it into the tree :)
     rbnode *currentNode = treemap->head;
     while (currentNode != NULL) {
+        comp = treemap->comparator(key, currentNode->key);
+
 	// Go right?
-        if (key > currentNode->key) {
+        if (comp == 1) {
 	    if (currentNode->right == NULL) {
 	        currentNode->right = node;
 		node->parent = currentNode;
@@ -209,7 +215,7 @@ static int insert(lpx_treemap_t *treemap, long key, long value)
 	}
        
 	// Go left?
-        if (key < currentNode->key) {
+        if (comp == -1) {
 	    if (currentNode->left == NULL) {
 	        currentNode->left = node;
 		node->parent = currentNode;
@@ -221,7 +227,7 @@ static int insert(lpx_treemap_t *treemap, long key, long value)
 	}
 
 	// Replace the current value, deallocate the new node & exit.
-	if (currentNode->key == key) {
+	if (comp == 0) {
 	    currentNode->value = value;
 	    FREE(treemap->pool, node);
 	    return TREEMAP_SUCCESS;
@@ -991,5 +997,42 @@ int lpx_treemap_check_rb_conflicts(lpx_treemap_t *treemap)
     } else {
         return TREEMAP_SUCCESS;
     }
+}
+
+/**
+ * @brief Replace the standard comparator with a custom one to be called
+ *        for key comparison.
+ * @param treemap The treemap to modify.
+ * @param comparator The comparator to use.
+ * @return 0 on success, -1 on failure.
+ */
+int lpx_treemap_override_comparator(lpx_treemap_t *treemap, 
+                                    int (*comparator)(unsigned long, unsigned long))
+{
+    if (treemap == NULL || comparator == NULL) {
+        return -1;
+    }
+
+    treemap->comparator = comparator;
+    return 0;
+}
+
+/**
+ * @brief  The default comparator that just treats both values as longs.
+ * @param  v1 The first value.
+ * @param  v2 The second value.
+ * @return -1 if v1 < v2, +1 if v2 > v2, 0 if v1 = v2.
+ */
+static int default_comparator(unsigned long v1, unsigned long v2)
+{
+    int retval = 0;
+
+    if (v1 > v2) {
+        retval = 1;
+    } else if (v1 < v2) {
+        retval = -1;
+    }
+
+    return retval;
 }
 
