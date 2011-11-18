@@ -137,6 +137,33 @@ cfbpool_destroy1: free(pool->poolMutex);
     return MEMPOOL_FAILURE;
 }
 
+/**
+ * @brief  Pin the memory that backs the pool in RAM.
+ * @param  pool The pool to pin in memory.
+ * @return 0 on success, -1 on failure.
+ */
+int lpx_mempool_pin_fixed_pool(lpx_mempool_fixed_t *pool)
+{
+    if (pool == NULL) {
+        return MEMPOOL_FAILURE;
+    }
+
+    return mlock(pool->pool, pool->poolSize);
+}
+
+/**
+ * @brief  Unpin the memory that backs the pool from RAM.
+ * @param  pool The pool to unpin.
+ * @return 0 on success, -1 on failure.
+ */
+int lpx_mempool_unpin_fixed_pool(lpx_mempool_fixed_t *pool)
+{
+    if (pool == NULL) {
+        return MEMPOOL_FAILURE;
+    }
+
+    return munlock(pool->pool, pool->poolSize);
+}
 
 /**
  * @brief  Allocate an object from a fixed sized pool.
@@ -240,6 +267,9 @@ int lpx_mempool_destroy_fixed_pool(lpx_mempool_fixed_t *pool)
 
     pool->magic = 0;
 
+    /* Be safe and unlock the address range. */
+    lpx_mempool_unpin_fixed_pool(pool);
+
     if (pool->poolMutex != NULL) {
         pthread_mutex_destroy(pool->poolMutex);
         free(pool->poolMutex);
@@ -332,6 +362,34 @@ int lpx_mempool_create_variable_pool(lpx_mempool_variable_t *pool,
     }
 
     return lpx_mempool_create_variable_pool_from_block(pool, size, isProtected, base);
+}
+
+/**
+ * @brief  Pin the memory that is backing the pool in RAM.
+ * @param  The memory pool to pin.
+ * @return 0 on success, -1 on failure.
+ */
+int lpx_mempool_pin_variable_pool(lpx_mempool_variable_t *pool)
+{
+    if (pool == NULL) {
+        return MEMPOOL_FAILURE;
+    }
+
+    return mlock(pool->pool, pool->poolSize);
+}
+
+/**
+ * @brief  Unpin the memory that is backing the pool from RAM.
+ * @param  The memory pool to unpin.
+ * @return 0 on success, -1 on failure.
+ */
+int lpx_mempool_unpin_variable_pool(lpx_mempool_variable_t *pool)
+{
+    if (pool == NULL) {
+        return MEMPOOL_FAILURE;
+    }
+
+    return munlock(pool->pool, pool->poolSize);
 }
 
 /**
@@ -451,6 +509,9 @@ int lpx_mempool_destroy_variable_pool(lpx_mempool_variable_t *pool)
     if (pool == NULL || pool->magic != MEMPOOL_VARIABLE_MAGIC || pool->pool == NULL) {
         return MEMPOOL_FAILURE;
     }
+
+    /* Be safe and shoot off a call to munlock this address range. */
+    lpx_mempool_unpin_variable_pool(pool);
 
     free(pool->pool);
     
