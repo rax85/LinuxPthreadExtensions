@@ -7,7 +7,10 @@
 CC=gcc
 COVOPTS=-fprofile-arcs -ftest-coverage
 PROFOPTS=-pg
-COPTS=-g -O0 -Wall -fpic -c $(COVOPTS) $(PROFOPTS)
+USE_PREFETCH=-DUSE_PREFETCH
+USE_PREDICTOR_HINTS=-DUSE_PREDICTOR_HINTS
+COPTS=-g -O0 -Wall -fpic -c $(COVOPTS) $(PROFOPTS) $(USE_PREFETCH) $(USE_PREDICTOR_HINTS) 
+#COPTS=-O2 -s -c $(USE_PREFETCH) $(USE_PREDICTOR_HINTS)
 AR=ar
 AROPTS=rcs
 
@@ -26,28 +29,28 @@ libpthreadext.so.1.0.1 : pthreadExtObjs
 
 pthreadExtObjs : sem.o threadpool.o mempool.o pcQueue.o tcpserver.o treemap.o arraylist.o
 
-threadpool.o : threadPool.c threadPool.h sem.o
+threadpool.o : threadPool.c threadPool.h sem.o asmopt.h
 	$(CC) $(COPTS) -o threadpool.o threadPool.c
 
-sem.o : sem.c sem.h
+sem.o : sem.c sem.h asmopt.h
 	$(CC) $(COPTS) -o sem.o sem.c 
 
-mempool.o : mempool.c mempool.h
+mempool.o : mempool.c mempool.h asmopt.h
 	$(CC) $(COPTS) -o mempool.o mempool.c
 
-pcQueue.o : pcQueue.c pcQueue.h sem.o mempool.o
+pcQueue.o : pcQueue.c pcQueue.h sem.o mempool.o asmopt.h
 	$(CC) $(COPTS) -o pcQueue.o pcQueue.c
 
-rwlock.o : rwlock.c rwlock.h sem.o
+rwlock.o : rwlock.c rwlock.h sem.o asmopt.h
 	$(CC) $(COPTS) -o rwlock.o rwlock.c
 
-treemap.o : treemap.c treemap.h mempool.o rwlock.o
+treemap.o : treemap.c treemap.h mempool.o rwlock.o asmopt.h
 	$(CC) $(COPTS) -o treemap.o treemap.c
 
-arraylist.o : arraylist.c arraylist.h mempool.o rwlock.o
+arraylist.o : arraylist.c arraylist.h asmopt.h mempool.o rwlock.o
 	$(CC) $(COPTS) -o arraylist.o arraylist.c 
 
-tcpserver.o : pcQueue.o threadpool.o mempool.o tcpserver.c tcpserver.h
+tcpserver.o : pcQueue.o threadpool.o mempool.o tcpserver.c tcpserver.h asmopt.h
 	$(CC) $(COPTS) -o tcpserver.o tcpserver.c
 
 documentation : Doxyfile
@@ -57,7 +60,7 @@ Doxyfile :
 	doxygen -g
 
 test : test.c staticlib
-	gcc -g -o test.out test.c libpthreadext.a -lpthread -lrt -lgcov 
+	gcc -g -o test.out test.c libpthreadext.a -lpthread -lrt -lgcov -pg 
 
 .PHONY clean : 
 	rm -f *.a *.so.* *.o *.out *.gc*; rm -rf html; rm -rf latex; rm -f Doxyfile

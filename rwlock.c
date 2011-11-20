@@ -30,7 +30,7 @@ extern long timespecDiffMillis(struct timespec greater, struct timespec lesser);
  */
 int lpx_rwlock_init(lpx_rwlock_t *rwlock)
 {
-    if (rwlock == NULL) {
+    if (UNLIKELY(rwlock == NULL)) {
         return RWLOCK_ERROR;
     }
 
@@ -54,7 +54,7 @@ int lpx_rwlock_init(lpx_rwlock_t *rwlock)
  */
 int lpx_rwlock_destroy(lpx_rwlock_t *rwlock)
 {
-    if (rwlock == NULL) {
+    if (UNLIKELY(rwlock == NULL)) {
         return RWLOCK_ERROR;
     }
 
@@ -74,7 +74,7 @@ int lpx_rwlock_acquire_reader_lock(lpx_rwlock_t *rwlock)
 {
     int retval = 0;
 
-    if (rwlock == NULL) {
+    if (UNLIKELY(rwlock == NULL)) {
         return RWLOCK_ERROR;
     }
 
@@ -119,7 +119,7 @@ int lpx_rwlock_acquire_reader_lock_timed(lpx_rwlock_t *rwlock, long timeoutMilli
     struct timespec after;
     int retval = 0;
 
-    if (rwlock == NULL) {
+    if (UNLIKELY(rwlock == NULL)) {
         return RWLOCK_ERROR;
     }
 
@@ -191,7 +191,7 @@ int lpx_rwlock_acquire_reader_lock_timed(lpx_rwlock_t *rwlock, long timeoutMilli
  */
 int lpx_rwlock_release_reader_lock(lpx_rwlock_t *rwlock)
 {
-    if (rwlock == NULL) {
+    if (UNLIKELY(rwlock == NULL)) {
         return RWLOCK_ERROR;
     }
 
@@ -227,7 +227,7 @@ int lpx_rwlock_acquire_writer_lock(lpx_rwlock_t *rwlock)
 {
     int retval = 0;
 
-    if (rwlock == NULL) {
+    if (UNLIKELY(rwlock == NULL)) {
         return RWLOCK_ERROR;
     }
 
@@ -272,7 +272,7 @@ int lpx_rwlock_acquire_writer_lock_timed(lpx_rwlock_t *rwlock, long timeoutMilli
     struct timespec after;
     int retval = 0;
 
-    if (rwlock == NULL) {
+    if (UNLIKELY(rwlock == NULL)) {
         return RWLOCK_ERROR;
     }
 
@@ -345,7 +345,7 @@ int lpx_rwlock_acquire_writer_lock_timed(lpx_rwlock_t *rwlock, long timeoutMilli
  */
 int lpx_rwlock_release_writer_lock(lpx_rwlock_t *rwlock)
 {
-    if (rwlock == NULL) {
+    if (UNLIKELY(rwlock == NULL)) {
         return RWLOCK_ERROR;
     }
 

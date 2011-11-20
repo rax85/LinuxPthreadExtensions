@@ -2,7 +2,7 @@
  * @file   arraylist.h
  * @brief  The interface for the arraylist.
  * @author Rakesh Iyer.
- * @bug    Unimplemented.
+ * @bug    Not performance tested.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -22,6 +22,7 @@
 #define __ARRAYLIST_H__
 
 #include <pthread.h>
+#include "asmopt.h"
 #include "rwlock.h"
 #include "mempool.h"
 

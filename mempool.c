@@ -45,7 +45,7 @@ int lpx_mempool_create_fixed_pool(lpx_mempool_fixed_t *pool,
                                   int numObjects, 
                                   int isProtected)
 {
-    if (pool == NULL || objectSize <= 0 || numObjects <= 0) {
+    if (UNLIKELY(pool == NULL || objectSize <= 0 || numObjects <= 0)) {
         return MEMPOOL_FAILURE;
     }
 
@@ -85,8 +85,8 @@ int lpx_mempool_create_fixed_pool_from_block(lpx_mempool_fixed_t *pool,
     long storedObjectSize = 0;
     int i = 0;
 
-    if (pool == NULL || base == NULL || objectSize <= 0 || 
-        numObjects <= 0 || size < objectSize + MEMPOOL_PER_OBJECT_OVERHEAD) {
+    if (UNLIKELY(pool == NULL || base == NULL || objectSize <= 0 ||
+        numObjects <= 0 || size < objectSize + MEMPOOL_PER_OBJECT_OVERHEAD)) {
         return MEMPOOL_FAILURE;
     }
 
@@ -144,7 +144,7 @@ cfbpool_destroy1: free(pool->poolMutex);
  */
 int lpx_mempool_pin_fixed_pool(lpx_mempool_fixed_t *pool)
 {
-    if (pool == NULL) {
+    if (UNLIKELY(pool == NULL)) {
         return MEMPOOL_FAILURE;
     }
 
@@ -158,7 +158,7 @@ int lpx_mempool_pin_fixed_pool(lpx_mempool_fixed_t *pool)
  */
 int lpx_mempool_unpin_fixed_pool(lpx_mempool_fixed_t *pool)
 {
-    if (pool == NULL) {
+    if (UNLIKELY(pool == NULL)) {
         return MEMPOOL_FAILURE;
     }
 
@@ -175,7 +175,7 @@ void *lpx_mempool_fixed_alloc(lpx_mempool_fixed_t *pool)
     void *addr = NULL;
     long *object = NULL;
     
-    if (pool == NULL || pool->magic != MEMPOOL_FIXED_MAGIC) {
+    if (UNLIKELY(pool == NULL || pool->magic != MEMPOOL_FIXED_MAGIC)) {
         return NULL;
     }
 
@@ -222,7 +222,7 @@ int lpx_mempool_fixed_free(void *addr)
     long *object = (long *)((long)addr - MEMPOOL_PER_OBJECT_OVERHEAD);
     lpx_mempool_fixed_t *pool = NULL;
 
-    if (addr == NULL) {
+    if (UNLIKELY(addr == NULL)) {
         return MEMPOOL_FAILURE;
     }
 
@@ -261,7 +261,7 @@ int lpx_mempool_fixed_free(void *addr)
  */
 int lpx_mempool_destroy_fixed_pool(lpx_mempool_fixed_t *pool)
 {
-    if (pool == NULL) {
+    if (UNLIKELY(pool == NULL)) {
         return MEMPOOL_FAILURE;
     }
 
@@ -297,7 +297,7 @@ int lpx_mempool_create_variable_pool_from_block(lpx_mempool_variable_t *pool,
 {
     long *blockMetadata = NULL;
 
-    if (pool == NULL || base == NULL) {
+    if (UNLIKELY(pool == NULL || base == NULL)) {
         return MEMPOOL_FAILURE;
     }
 
@@ -349,7 +349,7 @@ int lpx_mempool_create_variable_pool_from_block(lpx_mempool_variable_t *pool,
 int lpx_mempool_create_variable_pool(lpx_mempool_variable_t *pool, 
                                      long size, int isProtected)
 {
-    if (pool == NULL) {
+    if (UNLIKELY(pool == NULL)) {
         return MEMPOOL_FAILURE;
     }
 
@@ -371,7 +371,7 @@ int lpx_mempool_create_variable_pool(lpx_mempool_variable_t *pool,
  */
 int lpx_mempool_pin_variable_pool(lpx_mempool_variable_t *pool)
 {
-    if (pool == NULL) {
+    if (UNLIKELY(pool == NULL)) {
         return MEMPOOL_FAILURE;
     }
 
@@ -385,7 +385,7 @@ int lpx_mempool_pin_variable_pool(lpx_mempool_variable_t *pool)
  */
 int lpx_mempool_unpin_variable_pool(lpx_mempool_variable_t *pool)
 {
-    if (pool == NULL) {
+    if (UNLIKELY(pool == NULL)) {
         return MEMPOOL_FAILURE;
     }
 
@@ -403,7 +403,7 @@ void *lpx_mempool_variable_alloc(lpx_mempool_variable_t *pool, long size)
     void *candidateBlock = NULL;
     int unlockNeeded = 0;
     
-    if (pool == NULL) {
+    if (UNLIKELY(pool == NULL)) {
         return NULL;
     }
 
@@ -466,7 +466,7 @@ int lpx_mempool_variable_free(void *addr)
     long size = 0;
     long *originalBlock = (long *)addr;
 
-    if (addr == NULL) {
+    if (UNLIKELY(addr == NULL)) {
         return MEMPOOL_FAILURE;
     }
 
@@ -506,7 +506,7 @@ int lpx_mempool_variable_free(void *addr)
  */
 int lpx_mempool_destroy_variable_pool(lpx_mempool_variable_t *pool)
 {
-    if (pool == NULL || pool->magic != MEMPOOL_VARIABLE_MAGIC || pool->pool == NULL) {
+    if (UNLIKELY(pool == NULL || pool->magic != MEMPOOL_VARIABLE_MAGIC || pool->pool == NULL)) {
         return MEMPOOL_FAILURE;
     }
 

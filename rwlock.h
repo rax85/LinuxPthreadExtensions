@@ -24,6 +24,7 @@
 #include <pthread.h>
 #include <string.h>
 #include <errno.h>
+#include "asmopt.h"
 
 /**
  * @def   RWLOCK_SUCCESS
