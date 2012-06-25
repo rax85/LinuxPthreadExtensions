@@ -9,8 +9,11 @@ COVOPTS=-fprofile-arcs -ftest-coverage
 PROFOPTS=-pg
 USE_PREFETCH=-DUSE_PREFETCH
 USE_PREDICTOR_HINTS=-DUSE_PREDICTOR_HINTS
-COPTS=-g -O0 -Wall -fpic -c $(COVOPTS) $(PROFOPTS) $(USE_PREFETCH) $(USE_PREDICTOR_HINTS) 
-#COPTS=-O2 -s -c $(USE_PREFETCH) $(USE_PREDICTOR_HINTS)
+USE_SSE=-msse -msse2
+# Use this line for debug builds.
+# COPTS=-g -O0 -Wall -fpic -c $(COVOPTS) $(PROFOPTS) $(USE_PREFETCH) $(USE_PREDICTOR_HINTS)
+# Use this line for non-debug builds.
+COPTS=-O2 -s -c $(USE_PREFETCH) $(USE_PREDICTOR_HINTS) $(USE_SSE)
 AR=ar
 AROPTS=rcs
 
@@ -27,7 +30,7 @@ libpthreadext.a : pthreadExtObjs
 libpthreadext.so.1.0.1 : pthreadExtObjs
 	$(CC) -shared -Wl,-soname,libpthreadext.so.1 -o libpthreadext.so.1.0.1 *.o -lc
 
-pthreadExtObjs : sem.o threadpool.o mempool.o pcQueue.o tcpserver.o treemap.o arraylist.o
+pthreadExtObjs : sem.o threadpool.o mempool.o pcQueue.o tcpserver.o treemap.o arraylist.o fileio.o
 
 threadpool.o : threadPool.c threadPool.h sem.o asmopt.h
 	$(CC) $(COPTS) -o threadpool.o threadPool.c
@@ -52,6 +55,9 @@ arraylist.o : arraylist.c arraylist.h asmopt.h mempool.o rwlock.o
 
 tcpserver.o : pcQueue.o threadpool.o mempool.o tcpserver.c tcpserver.h asmopt.h
 	$(CC) $(COPTS) -o tcpserver.o tcpserver.c
+
+fileio.o : fileio.h fileio.c mempool.o
+	$(CC) $(COPTS) -o fileio.o fileio.c
 
 documentation : Doxyfile
 	doxygen Doxyfile
